@@ -1,7 +1,6 @@
 # Registry for High/Low noise LoRA pairs. 
 # If a prompt LoRA matches a trigger, the specific high/low files are injected into their respective paths.
 LORA_REGISTRY = [
-{ "triggers": ["dance_b high 250905", "dance_b low 250905"], "high": "dance_b high 250905", "low": "dance_b low 250905" },
 { "triggers": ["WAN22-LORA-flood-high", ""], "high": "WAN22-LORA-flood-high", "low": "" },
 { "triggers": ["WAN22-LORA-hbz-hydrogen-bomb-mushroom-cloud-hbz-22", ""], "high": "WAN22-LORA-hbz-hydrogen-bomb-mushroom-cloud-hbz-22", "low": "" },
 { "triggers": ["Wan22-LORA-high-waist-dance-V5", ""], "high": "Wan22-LORA-high-waist-dance-V5", "low": "" },

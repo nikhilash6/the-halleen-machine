@@ -176,22 +176,6 @@
       "title": "Save Image"
     }
   },
-  "81": {
-    "inputs": {
-      "mode": "random",
-      "seed": 392668576378088,
-      "index": 8,
-      "label": "Batch 001",
-      "path": "D:\\ComfyUI\\output\\dino\\trex\\stand",
-      "pattern": "*",
-      "allow_RGBA_output": "false",
-      "filename_text_extension": "true"
-    },
-    "class_type": "Load Image Batch",
-    "_meta": {
-      "title": "Load Image Batch"
-    }
-  },
   "93": {
     "inputs": {},
     "class_type": "VAEEncode",

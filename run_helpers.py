@@ -13,6 +13,7 @@ import copy
 import re
 import random
 import threading
+from platform_helpers import ProcessManager, PathHelper, ComfyUIManager, IS_WINDOWS
 
 # --- CONFIGURATION ---
 SCRIPT_DIRECTORY = str(Path(__file__).parent / "scripts")
@@ -59,25 +60,6 @@ def _format_status_file(file_path: Path, title: str):
     except Exception as e:
         return f"Error reading {file_path.name}: {e}"
 
-# def handle_upscale_batch(filepath: str, project_dict: dict, do_upscale: bool, do_interp: bool):
-# def handle_upscale_batch(filepath: str, project_dict: dict, do_upscale: bool, do_interp: bool, sequence_id=None):
-#     """Constructs and runs the command for the Upscale/Enhance batch."""
-#     if not filepath: return "Error: No project file loaded."
-#     if not do_upscale and not do_interp: return "Error: Select at least one option."
-
-#     base_path, _, error_msg = _get_project_paths(project_dict)
-#     if error_msg: return error_msg
-    
-#     status_file_path = base_path / "_upscale_status.json"
-#     script_path = os.path.join(SCRIPT_DIRECTORY, "run_upscale.py")
-    
-#     command = [sys.executable, "-u", script_path, "--config", filepath, "--status-file", str(status_file_path)]
-#     if do_upscale: command.append("--upscale")
-#     # if do_interp: command.append("--interpolate")
-#     if do_interp: command.append("--interpolate")
-#     if sequence_id: command.extend(["--sequence", sequence_id])
-    
-#     return _launch_detached_batch_script(command, status_file_path)
 
 def handle_upscale_batch(filepath: str, project_dict: dict, do_upscale: bool, do_interp: bool, sequence_id=None):
     """Constructs and runs the command for the Upscale/Enhance batch."""
@@ -123,20 +105,6 @@ def read_upscale_status(project_dict: dict):
     if error_msg: return error_msg
     return _format_status_file(base_path / "_upscale_status.json", "Enhance Batch")
 
-# def cancel_upscale_batch(project_dict: dict):
-#     base_path, _, error_msg = _get_project_paths(project_dict)
-#     if error_msg: return error_msg
-#     status_file_path = base_path / "_upscale_status.json"
-#     if not status_file_path.exists(): return "No active Enhance batch found."
-#     try:
-#         with open(status_file_path, 'r', encoding='utf-8') as f: data = json.load(f)
-#         pid = data.get("pid")
-#         if pid:
-#             subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
-#             data["status"] = "cancelled"
-#             with open(status_file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=2)
-#             return f"Cancelled Enhance batch (PID {pid})."
-#     except Exception as e: return f"Error cancelling: {e}"
 
 def cancel_upscale_batch(project_dict: dict, sequence_id=None):
     # Determine which status file to use
@@ -154,23 +122,14 @@ def cancel_upscale_batch(project_dict: dict, sequence_id=None):
         with open(status_file_path, 'r', encoding='utf-8') as f: data = json.load(f)
         pid = data.get("pid")
         if pid:
-            subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
+            # subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
+            ProcessManager.kill_process_tree(pid)
             data["status"] = "cancelled"
             with open(status_file_path, 'w', encoding='utf-8') as f: json.dump(data, f, indent=2)
             return f"Cancelled Enhance batch (PID {pid})."
     except Exception as e: return f"Error cancelling: {e}"
 
-# def build_enhance_manager():
-#     comps = {}
-#     with gr.Group():
-#         gr.Markdown("### Enhance / Post-Process")
-#         with gr.Row():
-#             comps["chk_upscale"] = gr.Checkbox(label="Upscale (2x Res)", value=False)
-#             comps["chk_interp"] = gr.Checkbox(label="Interpolate (2x FPS)", value=False)
-#         with gr.Row():
-#             comps["run_btn"] = gr.Button("Generate Layers", variant="primary")
-#             comps["cancel_btn"] = gr.Button("Cancel", variant="stop")
-#     return comps
+
 def build_enhance_manager():
     comps = {}
     with gr.Group():
@@ -228,25 +187,7 @@ def build_run_status_ui():
         comps["refresh_btn"] = gr.Button("Refresh Status", variant="secondary")
     return comps
 
-# def build_batch_inputs(prefix, label, form=None, paths=None, is_interactive=True):
-#     comps = {}
-#     with gr.Row():
-#         if form and paths:
-#             comps[f"{prefix}_iter"] = form.add(
-#                 paths["iter"],
-#                 gr.Number(label="Target number", info="Will stop generating when this many items are present", precision=0, interactive=is_interactive, minimum=0),
-#                 default=1,
-#                 to_json=int,
-#             )
-#         else:
-#             comps[f"{prefix}_iter"] = gr.Number(
-#                 label="Target number",info="Will stop generating when this many items are present",
-#                 value=1,
-#                 precision=0,
-#                 interactive=is_interactive,
-#                 minimum=0,
-#             )
-#     return comps
+
 
 def build_batch_inputs(prefix, label, form=None, paths=None, is_interactive=True):
     comps = {}
@@ -287,10 +228,6 @@ def build_batch_run_btn(prefix, label):
 def build_batch_cancel_btn(prefix):
     return gr.Button("Cancel", variant="stop")
 
-# def build_purge_ui(prefix, label):
-#     comps = {}
-#     with gr.Accordion(f"Purge {label}", open=False):
-#         comps[f"{prefix}_purge_btn"] = gr.Button(f"Purge {label}", variant="stop")
 def build_purge_ui(prefix, label):
     comps = {}
     with gr.Accordion(f"Purge All {label} Media", open=False, elem_classes=["themed-accordion", "stop-theme"]) as acc:
@@ -371,11 +308,16 @@ def _launch_detached_batch_script(command_parts: List[str], status_file_path: Pa
         except Exception as e: print(f"Warning: Could not clear status file: {e}")
 
     try:
-        process = subprocess.Popen(
+        # process = subprocess.Popen(
+        #     command_parts,
+        #     creationflags=subprocess.DETACHED_PROCESS,
+        #     close_fds=True,
+        #     env=env, cwd=cwd
+        # )
+        process = ProcessManager.launch_detached(
             command_parts,
-            creationflags=subprocess.DETACHED_PROCESS,
-            close_fds=True,
-            env=env, cwd=cwd
+            cwd=str(cwd) if cwd else None,
+            env=env
         )
         pid = process.pid
         # log_msg = f"Batch process started with PID {pid}" # OLD
@@ -451,7 +393,8 @@ def cancel_batch_script(project_dict: dict, batch_type: str, scope: str="project
         with open(status_file, 'r') as f: data = json.load(f)
         pid = data.get("pid")
         if pid:
-            subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
+            # subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
+            ProcessManager.kill_process_tree(pid)
             data["status"] = "cancelled"
             with open(status_file, 'w') as f: json.dump(data, f, indent=2)
             return f"Cancelled PID {pid}."
@@ -606,13 +549,7 @@ def handle_qc_batch(filepath: str, project_dict: dict, scope: str = "project", s
     if not base_path:
         return "Error: Could not determine project path."
     
-    # if scope == "sequence" and seq_id:
-    #     seq_path, _, _ = _get_sequence_paths(project_dict, seq_id)
-    #     status_file = seq_path / "_qc_status.json"
-    # elif scope == "poses":
-    #     status_file = base_path / "_poses" / "_qc_status.json"
-    # else:
-    #     status_file = base_path / "_qc_status.json"
+
     if scope == "sequence" and seq_id:
         seq_path, _, _ = _get_sequence_paths(project_dict, seq_id)
         status_file = seq_path / "_seq_qc_status.json"
@@ -647,14 +584,8 @@ def cancel_qc_batch(project_dict: dict, scope: str = "project", seq_id: str = No
     return cancel_batch_script(project_dict, "qc", scope, seq_id)
 
 
-# def read_qc_status(project_dict: dict, scope: str = "project", seq_id: str = None):
-#     """Read QC batch status."""
-#     if scope == "sequence" and seq_id:
-#         path, _, _ = _get_sequence_paths(project_dict, seq_id)
-#         status_file = path / "_qc_status.json" if path else None
-#     else:
-#         base_path, _, _ = _get_project_paths(project_dict)
-#         status_file = base_path / "_qc_status.json" if base_path else None
+
+
 def read_qc_status(project_dict: dict, scope: str = "project", seq_id: str = None):
     """Read QC batch status."""
     if scope == "sequence" and seq_id:
@@ -694,23 +625,6 @@ def read_qc_status(project_dict: dict, scope: str = "project", seq_id: str = Non
         return ""
 
 
-# def handle_qc_batch(filepath: str, project_dict: dict, scope: str = "project", seq_id: str = None, threshold: int = 3):
-#     """
-#     Launch batch QC scoring as a detached process.
-#     Survives browser close and app restart.
-#     """
-#     if not filepath:
-#         return "Error: No file."
-    
-#     base_path, _, _ = _get_project_paths(project_dict)
-#     if not base_path:
-#         return "Error: Could not determine project path."
-    
-#     if scope == "sequence" and seq_id:
-#         seq_path, _, _ = _get_sequence_paths(project_dict, seq_id)
-#         status_file = seq_path / "_qc_status.json"
-#     else:
-#         status_file = base_path / "_qc_status.json"
 
 
 def handle_cascade_batch(filepath: str, project_dict: dict, scope: str = "project", seq_id: str = None, kf_iterations: int = None, vid_iterations: int = None):
@@ -1164,57 +1078,6 @@ def handle_pose_batch(filepath: str, project_dict: dict, scope: str = "project",
                             main_image = max(candidates, key=lambda x: x.stat().st_mtime)
                             print(f"[POSE DEBUG] Selected: {main_image}")
 
-                    # if main_image:
-                    #     # Save to poses library
-                    #     pose_name = _sanitize_pose_filename(kf.get("layout", "")[:40] or f"pose_{kf_id}")
-                    #     pose_name += "_1CHAR"
-                    #     dest_path = _auto_version_pose_path(poses_dir / f"{pose_name}{main_image.suffix}")
-                        
-                    #     print(f"[POSE DEBUG] Copying to: {dest_path}")
-                    #     shutil.copy2(main_image, dest_path)
-                    #     print(f"[POSE DEBUG] Copy complete, exists: {dest_path.exists()}")
-                    # # Find output image
-                    # # output_root = temp_data.get("project", {}).get("comfy", {}).get("output_root", "")
-                    # # image_dir = Path(output_root) / "__test_cache__" / unique_id / unique_id
-                    
-                    # # main_image = None
-                    # # if image_dir.exists():
-                    # #     preview_keywords = {"openposepreview", "shapepreview", "outlinepreview"}
-                    # #     candidates = [
-                    # #         f for f in image_dir.iterdir() 
-                    # #         if f.suffix.lower() in {'.png', '.jpg', '.jpeg'}
-                    # #         and not any(kw in f.name for kw in preview_keywords)
-                    # #     ]
-                    # #     if candidates:
-                    # #         main_image = max(candidates, key=lambda x: x.stat().st_mtime)
-                    
-                    # # if main_image:
-                    # #     # Save to poses library
-                    # #     pose_name = _sanitize_pose_filename(kf.get("layout", "")[:40] or f"pose_{kf_id}")
-                    # #     pose_name += "_1CHAR"
-                    # #     dest_path = _auto_version_pose_path(poses_dir / f"{pose_name}{main_image.suffix}")
-                        
-                    # #     shutil.copy2(main_image, dest_path)
-                        
-                    #     # Also copy aux files if they exist
-                    #     for folder, suffix in [("poses", "openposepreview"), ("shapes", "shapepreview"), ("outlines", "outlinepreview")]:
-                    #         aux_candidates = [f for f in image_dir.iterdir() if suffix in f.name]
-                    #         if aux_candidates:
-                    #             aux_dir = poses_dir / folder
-                    #             aux_dir.mkdir(exist_ok=True)
-                    #             shutil.copy2(aux_candidates[0], aux_dir / dest_path.name)
-                        
-                    #     # Assign to keyframe
-                    #     master["sequences"][s_id]["keyframes"][kf_id]["pose"] = str(dest_path)
-                        
-                    #     # Save master
-                    #     with open(filepath, 'w') as f:
-                    #         json.dump(master, f, indent=2)
-                        
-                    #     completed += 1
-                    # else:
-                    #     failed += 1
-
 
                     if main_image:
                         # Extract controlnet previews
@@ -1400,61 +1263,8 @@ def handle_sequence_image_batch(pj, seq_id, iterations_override=None, cap=False,
     
     return _launch_detached_batch_script([sys.executable, "-u", os.path.join(SCRIPT_DIRECTORY, "run_images.py"), "--config", str(tf), "--status-file", str(sf)], sf)
 
-# def handle_sequence_image_batch(pj, seq_id, iterations_override=None):
-#     if not pj: return "Error: No project data."
-#     full = pj if isinstance(pj, dict) else {}
-#     tmp, err = _create_temp_json_for_sequence_batch(full, seq_id)
-#     if not tmp: return f"Error creating config.\n\n..."
-    
-#     # *** ADD OVERRIDE LOGIC HERE ***
-#     if iterations_override is not None:
-#         try:
-#             iter_count = int(iterations_override)
-#             if iter_count > 0:
-#                 if "project" not in tmp:
-#                     tmp["project"] = {}
-#                 if "keyframe_generation" not in tmp["project"]:
-#                     tmp["project"]["keyframe_generation"] = {}
-#                 tmp["project"]["keyframe_generation"]["image_iterations_default"] = iter_count
-#         except (ValueError, TypeError):
-#             pass
-    
-#     path, _, _ = _get_sequence_paths(pj, seq_id)
-#     sf = path / "_seq_images_status.json"
-#     tdir = _get_temp_dir(full) or Path(__file__).parent
-#     tf = tdir / f"__seq_img_{seq_id}.json"
-#     with open(tf, 'w') as f: json.dump(tmp, f)
-    
-#     return _launch_detached_batch_script([sys.executable, "-u", os.path.join(SCRIPT_DIRECTORY, "run_images.py"), "--config", str(tf), "--status-file", str(sf)], sf)
 
-# def handle_sequence_video_batch(pj, seq_id, iterations_override=None):
-#     if not pj: return "Error: No project data."
-#     full = pj if isinstance(pj, dict) else {}
-#     tmp, err = _create_temp_json_for_sequence_batch(full, seq_id)
-#     # if not tmp: return "Error creating config."
-#     if not tmp: return f"Error creating config.\n\ncreate_temp_json error: {err}\nseq_id passed in: {seq_id}\nsequence keys: {list(full.get('sequences', {}).keys())}"
 
-#     # Apply ephemeral iteration override if provided
-#     # Apply iteration override if provided
-#     if iterations_override is not None:
-#         try:
-#             iter_count = int(iterations_override)
-#             if iter_count > 0:
-#                 if "project" not in tmp:
-#                     tmp["project"] = {}
-#                 if "inbetween_generation" not in tmp["project"]:
-#                     tmp["project"]["inbetween_generation"] = {}
-#                 tmp["project"]["inbetween_generation"]["video_iterations_default"] = iter_count
-#         except (ValueError, TypeError):
-#             pass
-    
-#     path, _, _ = _get_sequence_paths(pj, seq_id)
-#     sf = path / "_seq_videos_status.json"
-#     tdir = _get_temp_dir(full) or Path(__file__).parent
-#     tf = tdir / f"__seq_vid_{seq_id}.json"
-#     with open(tf, 'w') as f: json.dump(tmp, f)
-    
-#     return _launch_detached_batch_script([sys.executable, "-u", os.path.join(SCRIPT_DIRECTORY, "run_video.py"), "--config", str(tf), "--status-file", str(sf)], sf)
 def handle_sequence_video_batch(pj, seq_id, iterations_override=None, cap=False, sync=False):
     if not pj: return "Error: No project data."
     full = pj if isinstance(pj, dict) else {}
@@ -1476,22 +1286,7 @@ def handle_sequence_video_batch(pj, seq_id, iterations_override=None, cap=False,
         except (ValueError, TypeError):
             pass
     
-    # Apply cap/force logic
-    # if not cap:
-    #     seq_data = tmp.get("sequences", {}).get(seq_id, {})
-    #     for vid in seq_data.get("videos", {}).values():
-    #         vid["force_generate"] = True
-    
-    # # Apply seed sync/randomize logic
-    # if not sync:
-    #     import random
-    #     rand_seed = random.randint(0, 2**31 - 1)
-    #     if "project" not in tmp:
-    #         tmp["project"] = {}
-    #     if "inbetween_generation" not in tmp["project"]:
-    #         tmp["project"]["inbetween_generation"] = {}
-    #     tmp["project"]["inbetween_generation"]["seed_start"] = rand_seed
-    # Apply cap/force logic and seed randomization
+
     import random
     seq_data = tmp.get("sequences", {}).get(seq_id, {})
     for vid in seq_data.get("videos", {}).values():
@@ -1517,34 +1312,74 @@ def cancel_comfy_queue(project_dict):
         return "Cancelled ComfyUI Queue."
     except: return "Failed to contact ComfyUI."
 
+# def handle_comfyui_restart(settings_json):
+#     import json
+#     sett = json.loads(settings_json) if isinstance(settings_json, str) else settings_json
+#     cust = sett.get("comfyui_restart_script_path", "")
+    
+#     msg = ["Attempting restart..."]
+#     yield "\n".join(msg)
+    
+#     # Kill 8188
+#     subprocess.run(["powershell", "-Command", "Stop-Process -Id (Get-NetTCPConnection -LocalPort 8188 -ErrorAction SilentlyContinue).OwningProcess -Force"], capture_output=True)
+#     msg.append("Killed old process.")
+#     yield "\n".join(msg)
+    
+#     if cust and os.path.exists(cust):
+#         subprocess.Popen([cust], shell=True, creationflags=subprocess.DETACHED_PROCESS)
+#         msg.append("Launched custom script.")
+#     else:
+#         # Fallback hardcoded
+#         py = r"D:\ComfyUI\comfy-py0310-venv\Scripts\python.exe"
+#         main = r"D:\ComfyUI\main.py"
+#         if os.path.exists(py) and os.path.exists(main):
+#             subprocess.Popen([py, main, "--listen", "0.0.0.0", "--port", "8188"], cwd=os.path.dirname(main), creationflags=subprocess.DETACHED_PROCESS)
+#             msg.append("Launched ComfyUI.")
+#         else:
+#             msg.append("Could not find ComfyUI or custom script.")
+            
+#     yield "\n".join(msg)
+
 def handle_comfyui_restart(settings_json):
     import json
     sett = json.loads(settings_json) if isinstance(settings_json, str) else settings_json
     cust = sett.get("comfyui_restart_script_path", "")
     
+    # Get paths from settings (cross-platform)
+    comfy_python = sett.get("comfyui_python_path", "")
+    comfy_main = sett.get("comfyui_main_path", "")
+    
+    # Platform-specific defaults if not configured
+    if not comfy_python:
+        if IS_WINDOWS:
+            comfy_python = r"D:\ComfyUI\comfy-py0310-venv\Scripts\python.exe"
+        else:
+            comfy_python = "/workspace/ComfyUI/venv/bin/python"
+    
+    if not comfy_main:
+        if IS_WINDOWS:
+            comfy_main = r"D:\ComfyUI\main.py"
+        else:
+            comfy_main = "/workspace/ComfyUI/main.py"
+    
     msg = ["Attempting restart..."]
     yield "\n".join(msg)
     
-    # Kill 8188
-    subprocess.run(["powershell", "-Command", "Stop-Process -Id (Get-NetTCPConnection -LocalPort 8188 -ErrorAction SilentlyContinue).OwningProcess -Force"], capture_output=True)
-    msg.append("Killed old process.")
-    yield "\n".join(msg)
-    
-    if cust and os.path.exists(cust):
-        subprocess.Popen([cust], shell=True, creationflags=subprocess.DETACHED_PROCESS)
-        msg.append("Launched custom script.")
-    else:
-        # Fallback hardcoded
-        py = r"D:\ComfyUI\comfy-py0310-venv\Scripts\python.exe"
-        main = r"D:\ComfyUI\main.py"
-        if os.path.exists(py) and os.path.exists(main):
-            subprocess.Popen([py, main, "--listen", "0.0.0.0", "--port", "8188"], cwd=os.path.dirname(main), creationflags=subprocess.DETACHED_PROCESS)
-            msg.append("Launched ComfyUI.")
-        else:
-            msg.append("Could not find ComfyUI or custom script.")
-            
-    yield "\n".join(msg)
+    api_base = sett.get("comfy", {}).get("api_base", "http://127.0.0.1:8188")
 
+    # Use cross-platform ComfyUI manager
+    restart_log = ComfyUIManager.restart_comfyui(
+        # Extract port from api_base (e.g., "http://127.0.0.1:4000" -> 4000)
+        port = ComfyUIManager.extract_port_from_url(api_base, default=8188),
+        # port=8188,
+        custom_script=cust if cust else None,
+        python_path=comfy_python,
+        main_script=comfy_main,
+        listen="0.0.0.0"
+    )
+    msg.extend(restart_log)
+    
+    yield "\n".join(msg)
 
 def check_comfyui_status(project_dict, api_base=None):
     # If api_base provided, use it (from app startup settings)

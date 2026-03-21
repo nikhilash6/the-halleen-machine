@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.1 Beta**  
+**Version 0.9.2 Beta**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -14,7 +14,7 @@ Organize AI video projects into structured timelines. Create reusable asset libr
 
 - Python 3.11+ 
 - ComfyUI installed and running
-- Windows (Linux untested but should work with some small adjustments, coming in 1.0)
+
 
 ---
 
@@ -22,12 +22,17 @@ Organize AI video projects into structured timelines. Create reusable asset libr
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/the-halleen-machine.git
+git clone https://github.com/mikehalleen/the-halleen-machine.git
 cd the-halleen-machine
 
 # Create virtual environment
 python -m venv venv
+
+# Activate it
+# Windows:
 venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -37,7 +42,7 @@ cp config.toml.example config.toml
 # Edit config.toml with your ComfyUI paths
 
 # Launch
-python app.py
+python app.py --listen 0.0.0.0 --port 7860
 ```
 
 ---
@@ -72,7 +77,7 @@ https://www.youtube.com/halleen
 ## Beta Status
 
 - ✅ Windows tested and supported
-- ❓ Linux untested
+- ❓ Linux minimally tested
 - Minor bugs, no detailed installation guide (coming in v1.0)
 
 ---

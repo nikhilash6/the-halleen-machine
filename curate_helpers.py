@@ -122,7 +122,9 @@ def _render_html(path_str: str, label: str):
     valid = p and p.exists()
     fname = _front_trunc(p.name if valid else "— no selection —")
     if valid:
-        url = f"/gradio_api/file={str(p).replace('\\','/')}"
+        # url = f"/gradio_api/file={str(p).replace('\\','/')}"
+        path_str = str(p).replace('\\', '/')
+        url = f"/gradio_api/file={path_str}"
         if p.suffix.lower() == ".mp4":
             media = f"<video src='{url}' controls></video>"
         else:

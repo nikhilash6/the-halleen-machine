@@ -589,22 +589,6 @@
       "title": "Preview Image"
     }
   },
-  "81": {
-    "inputs": {
-      "mode": "random",
-      "seed": 441676876097061,
-      "index": 8,
-      "label": "Batch 001",
-      "path": "D:\\ComfyUI\\output\\dino\\trex\\stand",
-      "pattern": "*",
-      "allow_RGBA_output": "false",
-      "filename_text_extension": "true"
-    },
-    "class_type": "Load Image Batch",
-    "_meta": {
-      "title": "Load Image Batch"
-    }
-  },
   "83": {
     "inputs": {
       "images": [

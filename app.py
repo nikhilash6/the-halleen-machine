@@ -42,6 +42,213 @@ project_json_init = {}
 SAMPLER_CHOICES = ['dpmpp_2m_sde', 'dpmpp_2m', 'dpmpp_sde', 'euler', 'euler_ancestral', 'lms', 'heun', 'dpm_fast']
 SCHEDULER_CHOICES = ['karras', 'normal', 'simple', 'exponential']
 
+# def _check_config_on_startup():
+#     """
+#     Quick validation of config.toml on startup.
+#     Prints warning if missing/invalid, but doesn't block the app.
+#     """
+#     from pathlib import Path
+#     import sys
+    
+#     config_path = Path("config.toml")
+    
+#     if not config_path.exists():
+#         print()
+#         print("=" * 70)
+#         print("⚠️  WARNING: config.toml not found!")
+#         print()
+#         print("   The app may not work correctly without configuration.")
+#         print()
+#         print("   To fix, either:")
+#         print("     1. Run:  python setup.py")
+#         print("     2. Copy config.toml.example to config.toml and edit manually")
+#         print("=" * 70)
+#         print()
+#         return False
+    
+#     # Try to parse and check required fields
+#     if sys.version_info >= (3, 11):
+#         import tomllib
+#     else:
+#         try:
+#             import tomli as tomllib
+#         except ImportError:
+#             # Can't validate without tomli, load_config will warn anyway
+#             return True
+    
+#     try:
+#         with open(config_path, "rb") as f:
+#             data = tomllib.load(f)
+#     except Exception as e:
+#         print()
+#         print("=" * 70)
+#         print(f"⚠️  WARNING: config.toml has syntax errors: {e}")
+#         print()
+#         print("   To fix, either:")
+#         print("     1. Run:  python setup.py")
+#         print("     2. Fix the TOML syntax in config.toml")
+#         print("=" * 70)
+#         print()
+#         return False
+    
+#     # Check for empty required fields
+#     errors = []
+    
+#     output_root = data.get("comfyui", {}).get("output_root", "")
+#     if not output_root:
+#         errors.append("[comfyui] output_root is not set")
+    
+#     models = data.get("paths", {}).get("models", "")
+#     if not models:
+#         errors.append("[paths] models is not set")
+    
+#     if errors:
+#         print()
+#         print("=" * 70)
+#         print("⚠️  WARNING: config.toml is incomplete!")
+#         print()
+#         for e in errors:
+#             print(f"   • {e}")
+#         print()
+#         print("   To fix, either:")
+#         print("     1. Run:  python setup.py")
+#         print("     2. Edit config.toml and fill in the missing values")
+#         print("=" * 70)
+#         print()
+#         return False
+    
+#     return True
+
+
+# def _check_config_on_startup() -> bool:
+#     """
+#     Validate config.toml on startup.
+    
+#     Returns:
+#         True if config exists and has required fields.
+#         False if missing, invalid, or incomplete (prints instructions).
+#     """
+#     from pathlib import Path
+#     import sys
+    
+#     config_path = Path("config.toml")
+    
+#     if not config_path.exists():
+#         print()
+#         print("=" * 70)
+#         print("⚠️  config.toml not found!")
+#         print()
+#         print("   To configure, run:  python setup.py")
+#         print("   Or copy config.toml.example to config.toml and edit manually.")
+#         print("=" * 70)
+#         print()
+#         return False
+    
+#     # Try to parse
+#     if sys.version_info >= (3, 11):
+#         import tomllib
+#     else:
+#         try:
+#             import tomli as tomllib
+#         except ImportError:
+#             # Can't validate without tomli, assume OK
+#             return True
+    
+#     try:
+#         with open(config_path, "rb") as f:
+#             data = tomllib.load(f)
+#     except Exception as e:
+#         print()
+#         print("=" * 70)
+#         print(f"⚠️  config.toml has syntax errors: {e}")
+#         print()
+#         print("   To fix, run:  python setup.py")
+#         print("=" * 70)
+#         print()
+#         return False
+    
+#     # Check required fields
+#     errors = []
+#     if not data.get("comfyui", {}).get("output_root"):
+#         errors.append("[comfyui] output_root")
+#     if not data.get("paths", {}).get("models"):
+#         errors.append("[paths] models")
+    
+#     if errors:
+#         print()
+#         print("=" * 70)
+#         print("⚠️  config.toml is incomplete - missing:")
+#         for e in errors:
+#             print(f"     • {e}")
+#         print()
+#         print("   To fix, run:  python setup.py")
+#         print("=" * 70)
+#         print()
+#         return False
+
+
+def _check_config_on_startup():
+    """
+    Validate config.toml on startup.
+    Exits if missing/invalid.
+    """
+    from pathlib import Path
+    import sys
+    
+    config_path = Path("config.toml")
+    
+    if not config_path.exists():
+        print()
+        print("=" * 70)
+        print("  config.toml not found!")
+        print()
+        print("  To fix, run:  python setup.py or copy config.toml.example to config.toml and edit manually")
+        print("=" * 70)
+        print()
+        sys.exit(1)
+    
+    # Try to parse
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib
+        except ImportError:
+            return
+    
+    try:
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception as e:
+        print()
+        print("=" * 70)
+        print(f"  config.toml has syntax errors: {e}")
+        print()
+        print("  To fix, run:  python setup.py or copy config.toml.example to config.toml and edit manually")
+        print("=" * 70)
+        print()
+        sys.exit(1)
+    
+    # Check required fields
+    errors = []
+    if not data.get("comfyui", {}).get("output_root"):
+        errors.append("[comfyui] output_root")
+    if not data.get("paths", {}).get("models"):
+        errors.append("[paths] models")
+    
+    if errors:
+        print()
+        print("=" * 70)
+        print("  config.toml is incomplete - missing:")
+        for e in errors:
+            print(f"     - {e}")
+        print()
+        print("  To fix, run:  python setup.py or copy config.toml.example to config.toml and edit manually")
+        print("=" * 70)
+        print()
+        sys.exit(1)
+
+
 
 def _ts_name():
     return datetime.now().strftime("Untitled-%Y%m%d-%H%M%S")
@@ -454,7 +661,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
     with gr.Row(elem_id="header-row"):
         # Column 1: Title block
         with gr.Column(scale=1, min_width=300):
-            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.1</small>", elem_id="app-title")
+            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.2</small>", elem_id="app-title")
             project_name_header = gr.Markdown("", elem_id="project-path-display")
         
         # Column 2: Utility cluster
@@ -1413,7 +1620,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
 
 # if __name__ == "__main__":
 if __name__ == "__main__":
-    host = os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1")
+    host = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0")
     port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
  
     # settings = ensure_settings()
@@ -1437,19 +1644,49 @@ if __name__ == "__main__":
 
 
 
-    try:
-        comfy_output_path = project_json_init.get("project", {}).get("comfy", {}).get("output_root")
-    except Exception:
-        comfy_output_path = None
+    # try:
+    #     comfy_output_path = project_json_init.get("project", {}).get("comfy", {}).get("output_root")
+    # except Exception:
+    #     comfy_output_path = None
 
+    # if not comfy_output_path:
+    #      comfy_output_path = DEFAULT_PROJECT["project"]["comfy"]["output_root"]
+
+
+    # Priority: config.toml → project JSON → DEFAULT_PROJECT
+    comfy_output_path = None
+
+    # 1. Try config.toml first (settings loaded from config.toml)
+    if settings:
+        # comfy_output_path = settings.get("comfyui", {}).get("output_root") if isinstance(settings.get("comfyui"), dict) else settings.get("output_root")
+        comfy_output_path = settings.get("comfy", {}).get("output_root")
+
+    # 2. Fall back to project JSON
     if not comfy_output_path:
-         comfy_output_path = DEFAULT_PROJECT["project"]["comfy"]["output_root"]
+        try:
+            comfy_output_path = project_json_init.get("project", {}).get("comfy", {}).get("output_root")
+        except Exception:
+            pass
+
+    # 3. Fall back to DEFAULT_PROJECT
+    if not comfy_output_path:
+        comfy_output_path = DEFAULT_PROJECT["project"]["comfy"]["output_root"]
+
+
 
     if comfy_output_path and os.path.isdir(comfy_output_path):
         allowed_paths.append(os.path.normpath(comfy_output_path))
         
     unique_allowed_paths = sorted(list(set(allowed_paths)))
     
+    print(f"[DEBUG] comfy_output_path = {comfy_output_path}")
+    print(f"[DEBUG] allowed_paths = {unique_allowed_paths}")
+    print(f"[DEBUG] settings type = {type(settings)}")
+    print(f"[DEBUG] settings.get('comfyui') = {settings.get('comfyui') if settings else 'settings is None'}")
+    print(f"[DEBUG] settings = {settings}")
+
+    _check_config_on_startup()
+
     demo.launch(
         server_name=host,
         server_port=port,

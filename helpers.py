@@ -598,7 +598,8 @@ def _rows_with_times(data: Dict[str, Any]) -> List[Tuple[str, str]]:
             v_prompt = v_obj.get("inbetween_prompt", "").strip()
             v_icon = "▶" if v_obj.get("selected_video_path") else "▷"
             
-            v_label = f"{v_icon} {v_time} {v_obj.get("vid")}"
+            # v_label = f"{v_icon} {v_time} {v_obj.get("vid")}"
+            v_label = f"{v_icon} {v_time} {v_obj.get('vid')}"
             if v_prompt:
                 v_label += f" | {v_prompt[:40]}"
             

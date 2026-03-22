@@ -14,10 +14,7 @@
     "inputs": {
       "add_noise": "disable",
       "noise_seed": 0,
-      "steps": [
-        "134",
-        0
-      ],
+      "steps": 4,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
@@ -49,11 +46,8 @@
   "86": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": 700235433288886,
-      "steps": [
-        "134",
-        0
-      ],
+      "noise_seed": 590015791092031,
+      "steps": 4,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
@@ -100,7 +94,7 @@
   },
   "89": {
     "inputs": {
-      "text": "over-saturated/gaudy color tones, overexposed, static, blurry/unclear details, subtitles, style, work/piece, painting/artwork, frame/scene, still/motionless, overall grayish/dull, worst quality, low quality, JPEG compression artifacts, ugly, defective/missing parts, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, motionless frame, cluttered background, three legs\n\n\nmagical reversal, distorted body reverse, suddenly reverse direction, jump cuts, teleporting, ghosting, duplicate limbs, deformed anatomy, rubbery skin, low detail, low quality, jpeg artifacts, oversaturated, overexposed, muddy gray, text, watermark, logo\n\nbackground dissolve, sudden background change, incongruent background change\n\n((detached penis))\n\n\n",
+      "text": "nsfw, nude, nudity\n",
       "clip": [
         "84",
         0
@@ -122,7 +116,7 @@
   },
   "93": {
     "inputs": {
-      "text": "Ink illustration on paper look and feel.  Eggshell white rough textured paper. Focus on foreground characters with mostly blank space around them except to give minimal context and setting  Detailed mostly monochrome professional master artist quality sketch\n()\n\nin a dense forest, two dinosaurs, one red and one green, are rolling in a tussling fight\n\naction: they roll to the right out of the forest an come to a stop, stand up and look at each other\n",
+      "text": "the person dances",
       "clip": [
         "84",
         0
@@ -166,15 +160,6 @@
       "title": "Load Diffusion Model"
     }
   },
-  "97": {
-    "inputs": {
-      "image": "dinos1_seq2_id2_00001_.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
-    }
-  },
   "101": {
     "inputs": {
       "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
@@ -186,7 +171,7 @@
     },
     "class_type": "LoraLoaderModelOnly",
     "_meta": {
-      "title": "LoraLoaderModelOnly"
+      "title": "Load LoRA"
     }
   },
   "102": {
@@ -200,7 +185,7 @@
     },
     "class_type": "LoraLoaderModelOnly",
     "_meta": {
-      "title": "LoraLoaderModelOnly"
+      "title": "Load LoRA"
     }
   },
   "103": {
@@ -232,17 +217,11 @@
   "111": {
     "inputs": {
       "upscale_method": "lanczos",
-      "width": [
-        "138",
-        0
-      ],
-      "height": [
-        "139",
-        0
-      ],
+      "width": 512,
+      "height": 512,
       "crop": "center",
       "image": [
-        "197",
+        "203",
         0
       ]
     },
@@ -251,246 +230,11 @@
       "title": "EndImage"
     }
   },
-  "123": {
-    "inputs": {
-      "a": [
-        "131",
-        0
-      ],
-      "b": 1,
-      "operation": "add"
-    },
-    "class_type": "easy mathInt",
-    "_meta": {
-      "title": "Add one more frame"
-    }
-  },
-  "126": {
-    "inputs": {
-      "value": 1
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "1"
-    }
-  },
-  "127": {
-    "inputs": {
-      "value": 2
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "2"
-    }
-  },
-  "129": {
-    "inputs": {
-      "value": 4
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "Steps (Final)"
-    }
-  },
-  "130": {
-    "inputs": {
-      "value": 2
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "Steps (Test)"
-    }
-  },
-  "131": {
-    "inputs": {
-      "a": [
-        "135",
-        0
-      ],
-      "b": [
-        "140",
-        0
-      ],
-      "operation": "multiply"
-    },
-    "class_type": "easy mathInt",
-    "_meta": {
-      "title": "calculate frame rate"
-    }
-  },
-  "133": {
-    "inputs": {
-      "boolean": false,
-      "on_true": [
-        "126",
-        0
-      ],
-      "on_false": [
-        "127",
-        0
-      ]
-    },
-    "class_type": "Switch any [Crystools]",
-    "_meta": {
-      "title": "FULL SIZE"
-    }
-  },
-  "134": {
-    "inputs": {
-      "boolean": true,
-      "on_true": [
-        "129",
-        0
-      ],
-      "on_false": [
-        "130",
-        0
-      ]
-    },
-    "class_type": "Switch any [Crystools]",
-    "_meta": {
-      "title": "FULL QUALITY"
-    }
-  },
-  "135": {
-    "inputs": {
-      "value": 5
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "SET LENGTH SECONDS"
-    }
-  },
-  "136": {
-    "inputs": {
-      "aspect_ratio": "16:9"
-    },
-    "class_type": "AspectRatioSelector",
-    "_meta": {
-      "title": "Aspect Ratio"
-    }
-  },
-  "138": {
-    "inputs": {
-      "expression": "a/b/0.6",
-      "a": [
-        "136",
-        1
-      ],
-      "b": [
-        "133",
-        0
-      ]
-    },
-    "class_type": "MathExpression|pysssss",
-    "_meta": {
-      "title": "Math Expression 🐍"
-    }
-  },
-  "139": {
-    "inputs": {
-      "expression": "a/b/0.6",
-      "a": [
-        "136",
-        2
-      ],
-      "b": [
-        "133",
-        0
-      ]
-    },
-    "class_type": "MathExpression|pysssss",
-    "_meta": {
-      "title": "Math Expression 🐍"
-    }
-  },
-  "140": {
-    "inputs": {
-      "value": 16
-    },
-    "class_type": "INTConstant",
-    "_meta": {
-      "title": "Frame rate"
-    }
-  },
-  "174": {
-    "inputs": {
-      "input1": [
-        "140",
-        0
-      ]
-    },
-    "class_type": "ConvertAny2Float",
-    "_meta": {
-      "title": "Convert to Float"
-    }
-  },
-  "179": {
-    "inputs": {
-      "text": "16",
-      "anything": [
-        "140",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
-  "180": {
-    "inputs": {
-      "text": "81",
-      "anything": [
-        "123",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
-  "181": {
-    "inputs": {
-      "text": "640",
-      "anything": [
-        "138",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
-  "182": {
-    "inputs": {
-      "text": "360",
-      "anything": [
-        "139",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
   "183": {
     "inputs": {
-      "width": [
-        "138",
-        0
-      ],
-      "height": [
-        "139",
-        0
-      ],
-      "length": [
-        "123",
-        0
-      ],
+      "width": 512,
+      "height": 512,
+      "length": 17,
       "batch_size": 1,
       "positive": [
         "93",
@@ -504,6 +248,10 @@
         "90",
         0
       ],
+      "start_image": [
+        "196",
+        0
+      ],
       "end_image": [
         "111",
         0
@@ -514,71 +262,20 @@
       "title": "WanFirstLastFrameToVideo"
     }
   },
-  "186": {
-    "inputs": {
-      "wildcard_text": "The input frame is a moment from a moving scene.  Start immediately in motion.  the camera moves stedicam or drone style to ((follow the creatures)) and maintain the same rough framing as they move.\n\nboth dinos are running side by side for their lives, urgent speed, running as ((fast)) as they can through the area and \n\n{\nleap over a gigantic roiling volcanic pit, bubbling with active lava explosions, small islands in the lava for dino to race on\n|\narrive at the top of a cliff, pause to look down, then leap in a single jump\n|\ndive into river rapids are carried away through rocky rapds, their bodies partially visible above the water\n|\nunflinchingly jump down a steep slope\n|\nroll down a rocky gorge\n}\n\n{\nactively fighting each other as they go, trying to slow or stop the other and get an advantage, but always moving away from the start location\n|\nthey accelerate and continue with urgency away from the start location\n}\n\nthe video ends far from the start location with the camera dollying in to a close up of the {darker|lighter} dino in the heat of the race",
-      "populated_text": "The input frame is a moment from a moving scene.  Start immediately in motion.  the camera moves stedicam or drone style to ((follow the creatures)) and maintain the same rough framing as they move.\n\nboth dinos are running side by side for their lives, urgent speed, running as ((fast)) as they can through the area and \n\n\narrive at the top of a cliff, pause to look down, then leap in a single jump\n\n\n\nactively fighting each other as they go, trying to slow or stop the other and get an advantage, but always moving away from the start location\n\n\nthe video ends far from the start location with the camera dollying in to a close up of the lighter dino in the heat of the race",
-      "mode": "populate",
-      "Select to add LoRA": "Select the LoRA to add to the text",
-      "Select to add Wildcard": "Select the Wildcard to add to the text",
-      "seed": 514923578414834
-    },
-    "class_type": "ImpactWildcardEncode",
-    "_meta": {
-      "title": "ImpactWildcardEncode"
-    }
-  },
-  "194": {
-    "inputs": {
-      "text": "640",
-      "anything": [
-        "138",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
-  "195": {
-    "inputs": {
-      "text": "360",
-      "anything": [
-        "139",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  },
   "196": {
     "inputs": {
       "upscale_method": "lanczos",
-      "width": [
-        "138",
+      "width": 512,
+      "height": 512,
+      "crop": "center",
+      "image": [
+        "202",
         0
-      ],
-      "height": [
-        "139",
-        0
-      ],
-      "crop": "center"
+      ]
     },
     "class_type": "ImageScale",
     "_meta": {
       "title": "StartImage"
-    }
-  },
-  "197": {
-    "inputs": {
-      "image": "ComfyUI_00010_.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
     }
   },
   "200": {
@@ -586,7 +283,6 @@
       "filename_prefix": "video/ComfyUI",
       "format": "auto",
       "codec": "auto",
-      "video-preview": "",
       "video": [
         "94",
         0
@@ -595,6 +291,37 @@
     "class_type": "SaveVideo",
     "_meta": {
       "title": "Save Video"
+    }
+  },
+  "201": {
+    "inputs": {
+      "filename_prefix": "",
+      "images": [
+        "87",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "202": {
+    "inputs": {
+      "image": "example.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "203": {
+    "inputs": {
+      "image": "example.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
     }
   }
 }

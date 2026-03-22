@@ -1,7 +1,7 @@
 {
   "3": {
     "inputs": {
-      "text": "watermark, low-res., extra limbs, extra dinosaurs, humans, text,  airplane, ping pong table, metal poles, metal object, straight metal pipe, genitalia, humans for scale, belly junk, eggs, dino eggs, children, families, family, signature, human fingers, drawing tools, sail, green skin, subject overlap, cropping (tails/feet/heads cut off), fisheye distortion, dutch angle, low angle tilt,",
+      "text": "",
       "clip": [
         "42",
         1
@@ -14,7 +14,7 @@
   },
   "4": {
     "inputs": {
-      "seed": 3263939,
+      "seed": 3263985,
       "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
@@ -58,20 +58,9 @@
       "title": "VAE Decode"
     }
   },
-  "9": {
-    "inputs": {
-      "width": 768,
-      "height": 1344,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
   "15": {
     "inputs": {
-      "ckpt_name": "isthisAnalogMadnessXL2.safetensors"
+      "ckpt_name": "analogMadnessSDXL_xl5.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -95,26 +84,6 @@
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
       },
-      "lora_1": {
-        "on": false,
-        "lora": "BixBeez.safetensors",
-        "strength": 1
-      },
-      "lora_2": {
-        "on": true,
-        "lora": "SDXL-LORA-D1N0_Tyrannosaurus_Rex_0.2-step00003500.safetensors",
-        "strength": 1
-      },
-      "lora_3": {
-        "on": false,
-        "lora": "PONY-LORA-Breast Slider--5-2 - Pony_alpha1.0_rank4_noxattn_last.safetensors",
-        "strength": 1.5
-      },
-      "lora_4": {
-        "on": false,
-        "lora": "PONY-LORA-Thigh Size Slider-0-5 V2_alpha1.0_rank4_noxattn_last.safetensors",
-        "strength": 1.2
-      },
       "➕ Add Lora": "",
       "model": [
         "15",
@@ -132,7 +101,7 @@
   },
   "46": {
     "inputs": {
-      "text": "Ink illustration on paper look and feel.  ((rough textured paper the color of very light off white)), ((consistent background texture and color from edge to edge to top to bottom)). Focus on foreground character(s) with lots of blank space around them except to give some context and setting  Detailed mostly monochrome professional master artist quality sketch\n\n\n((exactly one dinosaur, no more, no less)) in a clearing with a few rocks and shrubs\nD1N0_Tyrannosaurus_Rex king of the dinos, red stripes on his body, he's big but not huge, strong legs and torso, big muscular neck and jaws, scary looking but with a smile\n",
+      "text": "a man standing",
       "clip": [
         "42",
         1
@@ -143,29 +112,9 @@
       "title": "LeftPrompt"
     }
   },
-  "60": {
-    "inputs": {
-      "width": 768,
-      "height": 1344,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
-  "71": {
-    "inputs": {
-      "image": "gradient_right.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
-    }
-  },
   "74": {
     "inputs": {
-      "filename_prefix": "D:\\ComfyUI\\output\\dino\\combo\\combo\\combo",
+      "filename_prefix": "",
       "images": [
         "5",
         0
@@ -174,13 +123,6 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "Save Image"
-    }
-  },
-  "93": {
-    "inputs": {},
-    "class_type": "VAEEncode",
-    "_meta": {
-      "title": "VAE Encode"
     }
   },
   "162": {

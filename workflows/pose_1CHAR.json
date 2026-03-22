@@ -14,7 +14,7 @@
   },
   "4": {
     "inputs": {
-      "seed": 3264077,
+      "seed": 3264078,
       "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_3m_sde",
@@ -175,7 +175,7 @@
     },
     "class_type": "AV_ControlNetPreprocessor",
     "_meta": {
-      "title": "ControlNet Preprocessor"
+      "title": "[Deprecated] ControlNet Preprocessor"
     }
   },
   "32": {
@@ -215,7 +215,7 @@
     },
     "class_type": "AV_ControlNetPreprocessor",
     "_meta": {
-      "title": "ControlNet Preprocessor"
+      "title": "[Deprecated] ControlNet Preprocessor"
     }
   },
   "40": {
@@ -263,42 +263,6 @@
       "title": "LeftPrompt"
     }
   },
-  "60": {
-    "inputs": {
-      "width": 768,
-      "height": 1344,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
-  "74": {
-    "inputs": {
-      "filename_prefix": "D:\\ComfyUI\\output\\dino\\combo\\combo\\combo",
-      "images": [
-        "5",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
-  "79": {
-    "inputs": {
-      "images": [
-        "170",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
   "83": {
     "inputs": {
       "images": [
@@ -323,18 +287,6 @@
       "title": "Clean VRAM Used"
     }
   },
-  "93": {
-    "inputs": {
-      "pixels": [
-        "170",
-        0
-      ]
-    },
-    "class_type": "VAEEncode",
-    "_meta": {
-      "title": "VAE Encode"
-    }
-  },
   "162": {
     "inputs": {
       "image": "One_man_standing_medium_close_up_shot,_((one_man)),_behind_him_a_fabric_curtain,_looks_at_viewer,_ey.png"
@@ -342,18 +294,6 @@
     "class_type": "LoadImage",
     "_meta": {
       "title": "MainImageAndMask"
-    }
-  },
-  "164": {
-    "inputs": {
-      "images": [
-        "5",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
     }
   },
   "170": {
@@ -370,6 +310,19 @@
     "class_type": "ImageScale",
     "_meta": {
       "title": "Upscale Image"
+    }
+  },
+  "171": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
     }
   }
 }

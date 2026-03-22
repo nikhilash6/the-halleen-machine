@@ -24,17 +24,17 @@ import argparse
 MODEL_REGISTRY = {
     # Checkpoints
     "sdXL_v10VAEFix.safetensors": (
-        "",
+        "https://madels-for-machine.s3.us-west-2.amazonaws.com/sdXL_v10VAEFix.safetensors",
         "checkpoints",
         "SDXL base model with VAE fix. Used as default project model and fast pose model."
     ),
     "obsessionIllustrious_v21.safetensors": (
-        "",
+        "https://madels-for-machine.s3.us-west-2.amazonaws.com/obsessionIllustrious_v21.safetensors",
         "checkpoints",
         "Illustrious style model. Used for enhanced pose generation."
     ),
     "juggernautxl-inpainting.safetensors": (
-        "",
+        "https://madels-for-machine.s3.us-west-2.amazonaws.com/juggernautxl-inpainting.safetensors",
         "checkpoints",
         "Juggernaut XL inpainting model. Used for 2CHAR heal process."
     ),
@@ -59,38 +59,38 @@ MODEL_REGISTRY = {
     
     # CLIP / Text Encoder
     "umt5_xxl_fp8_e4m3fn_scaled.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
         "text_encoders",
         "UMT5-XXL text encoder for WAN 2.2 video generation."
     ),
     
     # VAE
     "wan_2.1_vae.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
         "vae",
         "WAN 2.1 VAE for video encoding/decoding."
     ),
     
     # Diffusion Models (UNETs)
     "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
         "diffusion_models",
         "WAN 2.2 Image-to-Video high noise model (14B params, FP8)."
     ),
     "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
         "diffusion_models",
         "WAN 2.2 Image-to-Video low noise model (14B params, FP8)."
     ),
     
     # LoRAs for WAN 2.2
     "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
         "loras",
         "WAN 2.2 LightX2V 4-step LoRA (high noise). Enables fast 4-step generation."
     ),
     "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors": (
-        "",  # TODO: Add URL
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
         "loras",
         "WAN 2.2 LightX2V 4-step LoRA (low noise). Enables fast 4-step generation."
     ),

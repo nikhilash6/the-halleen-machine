@@ -282,7 +282,8 @@ def configure_model(
     comfy_root: Path,
     paths: dict,
     model_num: int,
-    total_models: int
+    total_models: int,
+    current_value: str = ""
 ) -> tuple[str, bool]:
     """
     Configure a single model.
@@ -314,7 +315,17 @@ def configure_model(
     print(f"  {description}")
     print(f"  Default: {default_filename}")
     print(f"  Location: {model_folder}/")
+    if current_value:
+        print(f"  Current: {current_value}")
     print()
+    
+    # Check if current value exists (for reconfigure mode)
+    if current_value:
+        current_path = model_folder / current_value
+        if current_path.exists():
+            print(f"  ✓ Current model found on disk")
+            if prompt_yes_no(f"  Keep {current_value}?"):
+                return current_value, False
     
     # Check if default exists
     default_path = model_folder / default_filename
@@ -439,6 +450,112 @@ restart_script = "{norm(restart_script)}"
 '''
 
 
+def load_existing_config(config_path: Path) -> dict | None:
+    """Load existing config.toml and return parsed data."""
+    if not config_path.exists():
+        return None
+    
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib
+        except ImportError:
+            return None
+    
+    try:
+        with open(config_path, "rb") as f:
+            return tomllib.load(f)
+    except Exception:
+        return None
+
+
+def check_all_models(comfy_root: Path, config_data: dict) -> tuple[dict, dict]:
+    """
+    Check status of all models (config + video).
+    
+    Returns:
+        (config_model_status, video_model_status)
+        Each is a dict of {name: (configured_value, exists_on_disk)}
+    """
+    config_status = {}
+    video_status = {}
+    
+    models_base = comfy_root / "models"
+    
+    # Check config models
+    models_section = config_data.get("models", {})
+    paths_section = config_data.get("paths", {})
+    
+    for model_key, (default_filename, subfolder, _) in MODEL_DEFINITIONS.items():
+        configured_value = models_section.get(model_key, "")
+        
+        # Determine folder
+        if subfolder == "checkpoints":
+            model_folder = Path(paths_section.get("models", models_base / "checkpoints"))
+        elif subfolder == "controlnet":
+            model_folder = Path(paths_section.get("controlnet", models_base / "controlnet"))
+        elif subfolder == "upscale_models":
+            model_folder = Path(paths_section.get("upscale_models", models_base / "upscale_models"))
+        else:
+            model_folder = models_base / subfolder
+        
+        # Check if configured file exists, or if default exists
+        if configured_value:
+            exists = (model_folder / configured_value).exists()
+        else:
+            # Not configured - check if default exists
+            exists = (model_folder / default_filename).exists()
+            
+        config_status[model_key] = (configured_value, exists, default_filename)
+    
+    # Check video models
+    for filename, subfolder in VIDEO_MODELS.items():
+        model_path = models_base / subfolder / filename
+        video_status[filename] = model_path.exists()
+    
+    return config_status, video_status
+
+
+def display_model_status(config_status: dict, video_status: dict) -> tuple[list, list]:
+    """
+    Display model status and return lists of missing models.
+    
+    Returns:
+        (missing_config_keys, missing_video_filenames)
+    """
+    print()
+    print("-" * 60)
+    print("Model Status")
+    print("-" * 60)
+    print()
+    
+    print("CONFIG MODELS:")
+    missing_config = []
+    for model_key, (configured, exists, default) in config_status.items():
+        display_name = model_key.replace("_", " ").title()
+        filename = configured if configured else f"({default})"
+        
+        if exists:
+            print(f"  ✓ {display_name}: {filename}")
+        else:
+            print(f"  ✗ {display_name}: {filename} (MISSING)")
+            missing_config.append(model_key)
+    
+    print()
+    print("VIDEO MODELS:")
+    missing_video = []
+    for filename, exists in video_status.items():
+        if exists:
+            print(f"  ✓ {filename}")
+        else:
+            print(f"  ✗ {filename} (MISSING)")
+            missing_video.append(filename)
+    
+    print()
+    return missing_config, missing_video
+
+
 def validate_config(config_path: Path) -> tuple[bool, list[str]]:
     """Validate an existing config.toml file."""
     errors = []
@@ -510,20 +627,84 @@ def run_interactive():
     
     # Check for existing config
     if config_path.exists():
-        print(f"Found existing config.toml")
-        valid, errors = validate_config(config_path)
-        if valid:
-            print("  ✓ Configuration is valid!")
-            if not prompt_yes_no("Overwrite with new configuration?", default=False):
-                print("\nKeeping existing configuration.")
-                return 0
-        else:
-            print("  ✗ Configuration has errors:")
-            for e in errors:
-                print(f"     - {e}")
+        print("Found existing config.toml")
+        
+        # Load and validate
+        config_data = load_existing_config(config_path)
+        if not config_data:
+            print("  ✗ Failed to parse config.toml")
             if not prompt_yes_no("Generate new configuration?", default=True):
-                print("\nExiting. Fix errors manually or re-run setup.")
                 return 1
+            config_data = None
+        else:
+            # Get ComfyUI root from config
+            comfy_install = config_data.get("comfyui", {}).get("install_path", "")
+            if comfy_install:
+                comfy_root = Path(comfy_install)
+                
+                # Check all models
+                print()
+                print("Checking models...")
+                config_status, video_status = check_all_models(comfy_root, config_data)
+                missing_config, missing_video = display_model_status(config_status, video_status)
+                
+                if not missing_config and not missing_video:
+                    # All models present!
+                    print("=" * 60)
+                    print("All models present! Configuration is valid.")
+                    print("=" * 60)
+                    print()
+                    print("[Enter] Exit  |  [r] Reconfigure")
+                    choice = input("Choice: ").strip().lower()
+                    if choice != 'r':
+                        print("\nConfiguration unchanged.")
+                        return 0
+                    # Fall through to reconfigure
+                else:
+                    # Some models missing
+                    print("-" * 60)
+                    
+                    # Build download command
+                    if missing_config or missing_video:
+                        cmd_parts = ["python download_models.py"]
+                        if missing_config:
+                            cmd_parts.append("--all")
+                        if missing_video:
+                            cmd_parts.append("--video")
+                        print(f"To download missing models: {' '.join(cmd_parts)}")
+                    
+                    print()
+                    print("[Enter] Exit  |  [r] Reconfigure")
+                    choice = input("Choice: ").strip().lower()
+                    if choice != 'r':
+                        print("\nConfiguration unchanged.")
+                        return 0
+                    # Fall through to reconfigure
+            else:
+                print("  ✗ No install_path in config")
+                if not prompt_yes_no("Generate new configuration?", default=True):
+                    return 1
+                config_data = None
+    else:
+        config_data = None
+    
+    # =========================================================================
+    # RECONFIGURE MODE: Load current values as defaults
+    # =========================================================================
+    current_values = {}
+    if config_data:
+        current_values = {
+            "install_path": config_data.get("comfyui", {}).get("install_path", ""),
+            "output_root": config_data.get("comfyui", {}).get("output_root", ""),
+            "models_root": config_data.get("paths", {}).get("models", ""),
+            "loras_root": config_data.get("paths", {}).get("loras", ""),
+            "controlnet_root": config_data.get("paths", {}).get("controlnet", ""),
+            "upscale_root": config_data.get("paths", {}).get("upscale_models", ""),
+            "workspace": config_data.get("paths", {}).get("workspace", ""),
+            "restart_script": config_data.get("advanced", {}).get("restart_script", ""),
+            "api_base": config_data.get("comfyui", {}).get("api_base", "http://127.0.0.1:8188"),
+            "models": config_data.get("models", {}),
+        }
     
     # =========================================================================
     # STEP 1: ComfyUI Installation
@@ -531,17 +712,35 @@ def run_interactive():
     clear_screen()
     print_header(step=1, step_title="ComfyUI Installation")
     
-    detected = find_comfyui()
-    if detected:
-        print(f"✓ Found ComfyUI at: {detected}")
-        if prompt_yes_no("Use this installation?"):
-            comfy_root = detected
+    current_install = current_values.get("install_path", "")
+    
+    # Try current value first, then auto-detect
+    if current_install and Path(current_install).exists():
+        print(f"Current: {current_install}")
+        if prompt_yes_no("Keep this installation path?"):
+            comfy_root = Path(current_install)
         else:
-            comfy_root = Path(prompt_path("Enter ComfyUI installation path", must_exist=True))
+            detected = find_comfyui()
+            if detected and str(detected) != current_install:
+                print(f"✓ Found ComfyUI at: {detected}")
+                if prompt_yes_no("Use this installation?"):
+                    comfy_root = detected
+                else:
+                    comfy_root = Path(prompt_path("Enter ComfyUI installation path", default=current_install, must_exist=True))
+            else:
+                comfy_root = Path(prompt_path("Enter ComfyUI installation path", default=current_install, must_exist=True))
     else:
-        print("✗ Could not auto-detect ComfyUI installation.")
-        print("  Searched:", ", ".join(COMFY_SEARCH_PATHS[:4]), "...")
-        comfy_root = Path(prompt_path("Enter ComfyUI installation path", must_exist=True))
+        detected = find_comfyui()
+        if detected:
+            print(f"✓ Found ComfyUI at: {detected}")
+            if prompt_yes_no("Use this installation?"):
+                comfy_root = detected
+            else:
+                comfy_root = Path(prompt_path("Enter ComfyUI installation path", must_exist=True))
+        else:
+            print("✗ Could not auto-detect ComfyUI installation.")
+            print("  Searched:", ", ".join(COMFY_SEARCH_PATHS[:4]), "...")
+            comfy_root = Path(prompt_path("Enter ComfyUI installation path", must_exist=True))
     
     # Validate the chosen path
     valid, msg = validate_comfyui_path(comfy_root)
@@ -550,11 +749,23 @@ def run_interactive():
         if not prompt_yes_no("Continue anyway?", default=False):
             return 1
     
-    # Derive paths
-    paths = derive_paths(comfy_root)
+    # Derive paths (use current values as base if available)
+    derived = derive_paths(comfy_root)
+    if current_values:
+        # Prefer current values over derived
+        paths = {
+            "install_path": str(comfy_root),
+            "output_root": current_values.get("output_root") or derived["output_root"],
+            "models_root": current_values.get("models_root") or derived["models_root"],
+            "loras_root": current_values.get("loras_root") or derived["loras_root"],
+            "controlnet_root": current_values.get("controlnet_root") or derived["controlnet_root"],
+            "upscale_root": current_values.get("upscale_root") or derived["upscale_root"],
+        }
+    else:
+        paths = derived
     
     print()
-    print("Derived paths:")
+    print("Paths:")
     print(f"  Output:      {paths['output_root']}")
     print(f"  Checkpoints: {paths['models_root']}")
     print(f"  LoRAs:       {paths['loras_root']}")
@@ -583,7 +794,9 @@ def run_interactive():
     print("Where should project files be saved?")
     print("Use './samples' to keep them with the app, or an absolute path.")
     print()
-    workspace = prompt_path("Workspace directory", default="./samples")
+    
+    current_workspace = current_values.get("workspace", "./samples")
+    workspace = prompt_path("Workspace directory", default=current_workspace)
     
     # =========================================================================
     # STEP 3: ComfyUI Restart Script (Optional)
@@ -594,31 +807,43 @@ def run_interactive():
     print("Useful when running ComfyUI on a network device (e.g., mobile access).")
     print()
     
-    detected_script = find_restart_script(comfy_root)
+    current_restart = current_values.get("restart_script", "")
     restart_script = ""
     
-    if detected_script:
-        print(f"✓ Found restart script: {detected_script}")
-        if prompt_yes_no("Use this script?"):
-            restart_script = detected_script
-    else:
-        print("No restart script auto-detected.")
+    if current_restart and Path(current_restart).exists():
+        print(f"Current: {current_restart}")
+        if prompt_yes_no("Keep this restart script?"):
+            restart_script = current_restart
     
     if not restart_script:
-        if prompt_yes_no("Configure a restart script?", default=False):
-            restart_script = prompt_path("Path to restart script", must_exist=True)
+        detected_script = find_restart_script(comfy_root)
+        
+        if detected_script:
+            print(f"✓ Found restart script: {detected_script}")
+            if prompt_yes_no("Use this script?"):
+                restart_script = detected_script
         else:
-            print("Skipping - restart button will be disabled.")
+            print("No restart script auto-detected.")
+        
+        if not restart_script:
+            if prompt_yes_no("Configure a restart script?", default=False):
+                restart_script = prompt_path("Path to restart script", must_exist=True)
+            else:
+                print("Skipping - restart button will be disabled.")
     
     # =========================================================================
     # STEP 4: ComfyUI API
     # =========================================================================
     clear_screen()
     print_header(step=4, step_title="ComfyUI API")
-    api_base = "http://127.0.0.1:8188"
-    print(f"ComfyUI API URL: {api_base}")
-    if not prompt_yes_no("Use default API URL?"):
-        api_base = input("Enter ComfyUI API URL: ").strip() or api_base
+    
+    current_api = current_values.get("api_base", "http://127.0.0.1:8188")
+    print(f"ComfyUI API URL: {current_api}")
+    
+    if prompt_yes_no("Use this API URL?"):
+        api_base = current_api
+    else:
+        api_base = input(f"Enter ComfyUI API URL [{current_api}]: ").strip() or current_api
     
     # =========================================================================
     # STEP 5: Model Configuration
@@ -636,9 +861,14 @@ def run_interactive():
     
     model_keys = list(MODEL_DEFINITIONS.keys())
     total_models = len(model_keys)
+    current_models = current_values.get("models", {})
     
     for model_num, model_key in enumerate(model_keys, 1):
-        filename, needs_download = configure_model(model_key, comfy_root, paths, model_num, total_models)
+        current_model_value = current_models.get(model_key, "")
+        filename, needs_download = configure_model(
+            model_key, comfy_root, paths, model_num, total_models,
+            current_value=current_model_value
+        )
         configured_models[model_key] = filename
         
         if needs_download:
@@ -845,15 +1075,37 @@ def run_check():
     print()
     
     config_path = Path("config.toml")
-    valid, errors = validate_config(config_path)
     
-    if valid:
-        print("✓ Configuration is valid!")
+    # Load config
+    config_data = load_existing_config(config_path)
+    if not config_data:
+        print("✗ Failed to load config.toml")
+        return 1
+    
+    # Get ComfyUI root
+    comfy_install = config_data.get("comfyui", {}).get("install_path", "")
+    if not comfy_install:
+        print("✗ No install_path in config")
+        return 1
+    
+    comfy_root = Path(comfy_install)
+    
+    # Check all models
+    config_status, video_status = check_all_models(comfy_root, config_data)
+    missing_config, missing_video = display_model_status(config_status, video_status)
+    
+    if not missing_config and not missing_video:
+        print("✓ All models present! Configuration is valid.")
         return 0
     else:
-        print("✗ Configuration errors:")
-        for e in errors:
-            print(f"   - {e}")
+        print("-" * 60)
+        if missing_config or missing_video:
+            cmd_parts = ["python download_models.py"]
+            if missing_config:
+                cmd_parts.append("--all")
+            if missing_video:
+                cmd_parts.append("--video")
+            print(f"To download missing: {' '.join(cmd_parts)}")
         return 1
 
 

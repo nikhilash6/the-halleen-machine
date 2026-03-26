@@ -10,16 +10,8 @@
 # ==============================================================================
 
 # --- PHASE 0: COMFYUI INSTALLATION - SKIP if you already have ComfyUI running  ---
-# Update and install critical OS-level dependencies (Fixes CV2, GL, and FFmpeg issues)
+
 cd workspace
-apt update && apt install -y \
-    python3-venv \
-    libgl1 \
-    libglib2.0-0 \
-    ffmpeg \
-    build-essential \
-    git \
-    wget
 
 # Clone the official ComfyUI repository
 git clone https://github.com/comfyanonymous/ComfyUI.git
@@ -46,12 +38,8 @@ wget -O sdXL_v10VAEFix.safetensors https://madels-for-machine.s3.us-west-2.amazo
 cd ../..
 
 
-# Launch with --highvram for RTX 4090 performance 
 # The server will be accessible via RunPod's HTTP Port 8188
-python3 main.py --listen 0.0.0.0 --port 8188 --highvram
-
-
-## this should get you to a purple bottle, any problems, seek help with your LLM of choice and resources on YouTube, getting ComfyUI running can be complicated, but there is an amazing helpful community for you to rely on
+python3 main.py --listen 0.0.0.0 --port 8188 
 
 
 
@@ -151,7 +139,7 @@ cp samples/workflows_openincomfy/THM*.json /workspace/ComfyUI/user/default/workf
 # Now go to Comfy UI and open the workflows that start with "THM", they should be in your default folder.
 # One by one, open them and resolve any errors, missing nodes or models, vram configruation etc. Iterate until you can run the default prompts to get to a finished result.  Key values will be overridden by The Halleen Machine.  This is only to prove the nodes and models needed are in place.  
 # Editing these workflows will not change the ones run by The Halleen Machine, this step is for validation only. 
-
+# there's also the basic "purple bottle" workflow that used to be the ComfyUI default, use it for verifying basic functionality
 
 
 # --- PHASE 4: RUN THE HALLEEN MACHINE ---

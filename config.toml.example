@@ -12,7 +12,7 @@
 
 [comfyui]
 # The base directory of your ComfyUI installation (REQUIRED)
-# Windows example: "C:/ComfyUI"
+# Windows example: "D:/ComfyUI"
 # Linux/Mac example: "/home/username/ComfyUI"
 install_path = ""
 
@@ -26,27 +26,27 @@ timeout_seconds = 300
 
 # Where ComfyUI saves its generated images/videos (REQUIRED)
 # Usually: "<install_path>/output"
-# Windows example: "C:/ComfyUI/output"
+# Windows example: "D:/ComfyUI/output"
 # Linux/Mac example: "/home/username/ComfyUI/output"
 output_root = ""
 
 [paths]
 # Path to your checkpoint models (REQUIRED)
 # Usually: "<install_path>/models/checkpoints"
-# Windows example: "C:/ComfyUI/models/checkpoints"
+# Windows example: "D:/ComfyUI/models/checkpoints"
 # Linux/Mac example: "/home/username/ComfyUI/models/checkpoints"
 models = ""
 
 # Path to your LoRA files (REQUIRED)
 # Usually: "<install_path>/models/loras"
-# Windows example: "C:/ComfyUI/models/loras"
+# Windows example: "D:/ComfyUI/models/loras"
 # Linux/Mac example: "/home/username/ComfyUI/models/loras"
 loras = ""
 
 # Where this app will save your project files
 # Use relative path to keep projects with the app, or absolute path for elsewhere
 # Relative: "./samples" (uses samples folder shipped with app)
-# Absolute: "C:/MyProjects" or "/home/username/machine-projects"
+# Absolute: "D:/MyProjects" or "/home/username/machine-projects"
 workspace = "./samples"
 
 
@@ -85,8 +85,8 @@ interpolation_model = "xrife47.pth"
 # Optional: Script to restart ComfyUI server when using the restart button
 # Leave empty ("") if you don't use this feature
 #
-# Windows PowerShell: "C:/ComfyUI/start.ps1"
-# Windows Batch: "C:/ComfyUI/restart.bat"
+# Windows PowerShell: "D:/ComfyUI/start.ps1"
+# Windows Batch: "D:/ComfyUI/restart.bat"
 # Linux/Mac Shell: "/home/username/comfyui/restart.sh"
 restart_script = ""
 

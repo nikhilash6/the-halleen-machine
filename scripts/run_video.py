@@ -551,6 +551,47 @@ def project_neg(cfg_project):
     for k in ("keyframes_all", "inbetween_all", "heal_all"): neg.setdefault(k, "")
     return neg
 
+def resolve_lora_pair(name: str):
+    """
+    Resolve a LoRA name to high/low file pair.
+    
+    Priority:
+    1. Explicit registry entry
+    2. Auto-detect ai-toolkit _high_noise/_low_noise convention
+    3. Fallback: high-only
+    
+    Returns: (high_file, low_file, do_low)
+    """
+    name = name.strip()
+    
+    # 1. Registry takes priority
+    for entry in LORA_REGISTRY:
+        if name in entry["triggers"]:
+            print(f"[LORA] Registry match: {name}")
+            return entry["high"], entry["low"], bool(entry["low"])
+    
+    # 2. Auto-detect ai-toolkit naming
+    # Strip extension for pattern matching
+    stem = name.replace(".safetensors", "")
+    
+    if "_high_noise" in stem:
+        base = stem.replace("_high_noise", "")
+        high_file = f"{base}_high_noise.safetensors"
+        low_file = f"{base}_low_noise.safetensors"
+        print(f"[LORA] Auto-paired: {high_file} + {low_file}")
+        return high_file, low_file, True
+    
+    if "_low_noise" in stem:
+        base = stem.replace("_low_noise", "")
+        high_file = f"{base}_high_noise.safetensors"
+        low_file = f"{base}_low_noise.safetensors"
+        print(f"[LORA] Auto-paired: {high_file} + {low_file}")
+        return high_file, low_file, True
+    
+    # 3. No match - high-only
+    print(f"[LORA] No pair found, high-only: {name}")
+    return name, None, False
+
 def inject_prompt_loras(graph: dict, lora_list: list):
     if not lora_list: return
     try:
@@ -567,12 +608,13 @@ def inject_prompt_loras(graph: dict, lora_list: list):
             try: s = float(strength_str)
             except: continue
             
-            high_file, low_file, do_low = name.strip(), None, False
-            for entry in LORA_REGISTRY:
-                if name.strip() in entry["triggers"]:
-                    high_file, low_file, do_low = entry["high"], entry["low"], True
-                    break
-            
+            # high_file, low_file, do_low = name.strip(), None, False
+            # for entry in LORA_REGISTRY:
+            #     if name.strip() in entry["triggers"]:
+            #         high_file, low_file, do_low = entry["high"], entry["low"], True
+            #         break
+            high_file, low_file, do_low = resolve_lora_pair(name)
+
             nid_h = new_node_id(graph)
             graph[nid_h] = {"inputs": {"lora_name": high_file, "strength_model": s, "model": curr_high}, "class_type": "LoraLoaderModelOnly", "_meta": {"title": f"Injected_High_{high_file}"}}
             curr_high = [nid_h, 0]

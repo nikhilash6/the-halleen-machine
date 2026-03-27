@@ -985,7 +985,7 @@ def run_interactive():
         print()
     
     print()
-    print("Setup complete! Run: python app.py")
+    print("Setup complete! Run: python run.py")
     return 0
 
 

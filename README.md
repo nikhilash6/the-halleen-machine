@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.6 Beta** 
+**Version 0.9.6 Beta**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -67,7 +67,7 @@ https://www.youtube.com/halleen
 
 ## Beta Status
 
-- Minor bugs (coming in v1.0)
+- Minor bugs 
 - Pre-launch (before samples and how-to videos have been published)
 
 ---

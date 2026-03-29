@@ -11,7 +11,9 @@ import argparse, json, os, re, time, uuid, random, requests, sys, subprocess
 from datetime import datetime
 from pathlib import Path
 from fractions import Fraction
-from lora_registry import LORA_REGISTRY
+# from lora_registry import LORA_REGISTRY
+import csv
+from pathlib import Path
 
 # --- CONSTANTS & REGEX ---
 _LORA_RE = re.compile(r"__lora:([^:>]+):(.+?)__")
@@ -44,6 +46,26 @@ GENEROUS_ASSET_SIXTEENTHS = 2000
 # --- HELPERS ---
 
 
+
+
+
+def load_lora_registry():
+    """Load LoRA pairs from CSV file"""
+    csv_path = Path(__file__).parent / "lora_pairs.csv"
+    if not csv_path.exists():
+        return []
+    
+    registry = []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            high = row.get("high", "").strip()
+            low = row.get("low", "").strip()
+            if high:
+                registry.append({"high": high, "low": low or None})
+    return registry
+
+LORA_REGISTRY = load_lora_registry()
 
 
 def is_ltx2_workflow(wf_path):
@@ -541,38 +563,62 @@ def write_fcpxml(project_name, project_width, project_height, sequences_clips, o
     print(f"[EXPORT] FCPXML written -> {out_path}")
 
 
-def resolve_lora_pair(name: str):
-    """
-    Resolve a LoRA name to high/low file pair.
+# def resolve_lora_pair(name: str):
+#     """
+#     Resolve a LoRA name to high/low file pair.
     
-    Priority:
-    1. Explicit registry entry
-    2. Auto-detect ai-toolkit _high_noise/_low_noise convention
-    3. Fallback: high-only
+#     Priority:
+#     1. Explicit registry entry
+#     2. Auto-detect ai-toolkit _high_noise/_low_noise convention
+#     3. Fallback: high-only
     
-    Returns: (high_file, low_file) - either can be None
-    """
+#     Returns: (high_file, low_file) - either can be None
+#     """
 
+#     name = name.strip()
+#     if not name:
+#         return None, None
+#     stem = name.replace(".safetensors", "")
+    
+#     # 1. Registry takes priority (check both with and without extension)
+#     for entry in LORA_REGISTRY:
+#         if name in entry["triggers"] or stem in entry["triggers"]:
+#             high = entry.get("high") or None
+#             low = entry.get("low") or None
+#             # Ensure .safetensors extension
+#             if high and not high.endswith(".safetensors"):
+#                 high = f"{high}.safetensors"
+#             if low and not low.endswith(".safetensors"):
+#                 low = f"{low}.safetensors"
+#             print(f"[LORA] Registry match: {name} -> high:{high} low:{low}")
+#             return high, low
+    
+#     # 2. Auto-detect ai-toolkit naming
+    
+#     if "_high_noise" in stem or "_low_noise" in stem:
+#         base = stem.replace("_high_noise", "").replace("_low_noise", "")
+#         high_file = f"{base}_high_noise.safetensors"
+#         low_file = f"{base}_low_noise.safetensors"
+#         print(f"[LORA] Auto-paired: {high_file} + {low_file}")
+#         return high_file, low_file
+    
+#     # 3. No match - high-only
+#     print(f"[LORA] No pair found, high-only: {name}")
+#     return name, None
+
+def resolve_lora_pair(name: str):
     name = name.strip()
     if not name:
         return None, None
-    stem = name.replace(".safetensors", "")
     
-    # 1. Registry takes priority (check both with and without extension)
+    # 1. Check registry (match either high or low name)
     for entry in LORA_REGISTRY:
-        if name in entry["triggers"] or stem in entry["triggers"]:
-            high = entry.get("high") or None
-            low = entry.get("low") or None
-            # Ensure .safetensors extension
-            if high and not high.endswith(".safetensors"):
-                high = f"{high}.safetensors"
-            if low and not low.endswith(".safetensors"):
-                low = f"{low}.safetensors"
-            print(f"[LORA] Registry match: {name} -> high:{high} low:{low}")
-            return high, low
+        if name == entry["high"] or name == entry["low"]:
+            print(f"[LORA] Registry match: {name} -> high:{entry['high']} low:{entry['low']}")
+            return entry["high"], entry["low"]
     
-    # 2. Auto-detect ai-toolkit naming
-    
+    # 2. Auto-detect _high_noise/_low_noise pattern
+    stem = name.replace(".safetensors", "")
     if "_high_noise" in stem or "_low_noise" in stem:
         base = stem.replace("_high_noise", "").replace("_low_noise", "")
         high_file = f"{base}_high_noise.safetensors"
@@ -580,7 +626,7 @@ def resolve_lora_pair(name: str):
         print(f"[LORA] Auto-paired: {high_file} + {low_file}")
         return high_file, low_file
     
-    # 3. No match - high-only
+    # 3. Fallback - high only
     print(f"[LORA] No pair found, high-only: {name}")
     return name, None
 

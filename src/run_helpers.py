@@ -1632,8 +1632,8 @@ def build_run_tab(fp, pj, sett, form=None, features={}):
     with gr.Row():
         with gr.Column(scale=1):
             with gr.Accordion("ComfyUI", open=False,elem_classes=["themed-accordion", "proj-theme"]):
-                cancel_all = gr.Button("Stop and Clear Queue", variant="stop")
-                restart = gr.Button("Restart Server", variant="stop")
+                cancel_all = gr.Button("Cancel and Clear Queue", variant="stop")
+                restart = gr.Button("Restart ComfyUI", variant="stop")
             with gr.Accordion("Exports", open=False,elem_classes=["themed-accordion", "proj-theme"]):
                 pem = build_export_panel("project")
                 with gr.Accordion("Legacy", open=False, visible=False):

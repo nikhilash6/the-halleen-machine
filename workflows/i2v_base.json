@@ -14,12 +14,12 @@
     "inputs": {
       "add_noise": "disable",
       "noise_seed": 0,
-      "steps": 4,
+      "steps": 8,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "start_at_step": 2,
-      "end_at_step": 4,
+      "start_at_step": 5,
+      "end_at_step": 8,
       "return_with_leftover_noise": "disable",
       "model": [
         "103",
@@ -45,14 +45,14 @@
   },
   "86": {
     "inputs": {
-      "add_noise": "enable",
+      "add_noise": "disable",
       "noise_seed": 590015791092031,
-      "steps": 4,
+      "steps": 8,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "start_at_step": 0,
-      "end_at_step": 2,
+      "start_at_step": 2,
+      "end_at_step": 5,
       "return_with_leftover_noise": "enable",
       "model": [
         "104",
@@ -67,8 +67,8 @@
         1
       ],
       "latent_image": [
-        "183",
-        2
+        "204",
+        0
       ]
     },
     "class_type": "KSamplerAdvanced",
@@ -147,7 +147,7 @@
     },
     "class_type": "UNETLoader",
     "_meta": {
-      "title": "Load Diffusion Model"
+      "title": "HighNoiseUnet"
     }
   },
   "96": {
@@ -157,7 +157,7 @@
     },
     "class_type": "UNETLoader",
     "_meta": {
-      "title": "Load Diffusion Model"
+      "title": "LowNoiseUnet"
     }
   },
   "101": {
@@ -171,7 +171,7 @@
     },
     "class_type": "LoraLoaderModelOnly",
     "_meta": {
-      "title": "Load LoRA"
+      "title": "LoraLoaderModelOnly"
     }
   },
   "102": {
@@ -185,7 +185,7 @@
     },
     "class_type": "LoraLoaderModelOnly",
     "_meta": {
-      "title": "Load LoRA"
+      "title": "LoraLoaderModelOnly"
     }
   },
   "103": {
@@ -198,7 +198,7 @@
     },
     "class_type": "ModelSamplingSD3",
     "_meta": {
-      "title": "ModelSamplingSD3"
+      "title": "LowModelSampling"
     }
   },
   "104": {
@@ -211,7 +211,7 @@
     },
     "class_type": "ModelSamplingSD3",
     "_meta": {
-      "title": "ModelSamplingSD3"
+      "title": "HighModelSampling"
     }
   },
   "111": {
@@ -322,6 +322,52 @@
     "class_type": "LoadImage",
     "_meta": {
       "title": "Load Image"
+    }
+  },
+  "204": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 0,
+      "steps": 8,
+      "cfg": 2.5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "205",
+        0
+      ],
+      "positive": [
+        "183",
+        0
+      ],
+      "negative": [
+        "183",
+        1
+      ],
+      "latent_image": [
+        "183",
+        2
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "SlowMoPrimer"
+    }
+  },
+  "205": {
+    "inputs": {
+      "shift": 5.000000000000001,
+      "model": [
+        "95",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "PrimerModelSampling"
     }
   }
 }

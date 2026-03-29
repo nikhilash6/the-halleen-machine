@@ -32,9 +32,9 @@ PRIMER_STEPS = 2
 EXPRESS_STEPS = 6
 FULL_STEPS = 12
 DEFAULT_UPSCALE = False
-DEFAULT_SLOMOFIX = True
+# DEFAULT_SLOMOFIX = True
 DROP_JOIN_FRAME = True
-DEFAULT_SLOMOFIX_CFG = 2.5
+# DEFAULT_SLOMOFIX_CFG = 2.5
 
 TRIM_SE_EACH_SIDE = 1
 TRIM_O_ONE_SIDE   = 1
@@ -541,16 +541,6 @@ def write_fcpxml(project_name, project_width, project_height, sequences_clips, o
     print(f"[EXPORT] FCPXML written -> {out_path}")
 
 
-
-
-def project_neg(cfg_project):
-    neg = dict(cfg_project.get("negatives", {}) or {})
-    if not neg.get("global"):
-        legacy = cfg_project.get("negative_prompt", "")
-        if legacy: neg["global"] = legacy
-    for k in ("keyframes_all", "inbetween_all", "heal_all"): neg.setdefault(k, "")
-    return neg
-
 def resolve_lora_pair(name: str):
     """
     Resolve a LoRA name to high/low file pair.
@@ -560,114 +550,202 @@ def resolve_lora_pair(name: str):
     2. Auto-detect ai-toolkit _high_noise/_low_noise convention
     3. Fallback: high-only
     
-    Returns: (high_file, low_file, do_low)
+    Returns: (high_file, low_file) - either can be None
     """
+
     name = name.strip()
-    
-    # 1. Registry takes priority
-    for entry in LORA_REGISTRY:
-        if name in entry["triggers"]:
-            print(f"[LORA] Registry match: {name}")
-            return entry["high"], entry["low"], bool(entry["low"])
-    
-    # 2. Auto-detect ai-toolkit naming
-    # Strip extension for pattern matching
+    if not name:
+        return None, None
     stem = name.replace(".safetensors", "")
     
-    if "_high_noise" in stem:
-        base = stem.replace("_high_noise", "")
-        high_file = f"{base}_high_noise.safetensors"
-        low_file = f"{base}_low_noise.safetensors"
-        print(f"[LORA] Auto-paired: {high_file} + {low_file}")
-        return high_file, low_file, True
+    # 1. Registry takes priority (check both with and without extension)
+    for entry in LORA_REGISTRY:
+        if name in entry["triggers"] or stem in entry["triggers"]:
+            high = entry.get("high") or None
+            low = entry.get("low") or None
+            # Ensure .safetensors extension
+            if high and not high.endswith(".safetensors"):
+                high = f"{high}.safetensors"
+            if low and not low.endswith(".safetensors"):
+                low = f"{low}.safetensors"
+            print(f"[LORA] Registry match: {name} -> high:{high} low:{low}")
+            return high, low
     
-    if "_low_noise" in stem:
-        base = stem.replace("_low_noise", "")
+    # 2. Auto-detect ai-toolkit naming
+    
+    if "_high_noise" in stem or "_low_noise" in stem:
+        base = stem.replace("_high_noise", "").replace("_low_noise", "")
         high_file = f"{base}_high_noise.safetensors"
         low_file = f"{base}_low_noise.safetensors"
         print(f"[LORA] Auto-paired: {high_file} + {low_file}")
-        return high_file, low_file, True
+        return high_file, low_file
     
     # 3. No match - high-only
     print(f"[LORA] No pair found, high-only: {name}")
-    return name, None, False
+    return name, None
 
-def inject_prompt_loras(graph: dict, lora_list: list):
+def project_neg(cfg_project):
+    neg = dict(cfg_project.get("negatives", {}) or {})
+    if not neg.get("global"):
+        legacy = cfg_project.get("negative_prompt", "")
+        if legacy: neg["global"] = legacy
+    for k in ("keyframes_all", "inbetween_all", "heal_all"): neg.setdefault(k, "")
+    return neg
+
+
+
+def inject_prompt_loras(graph: dict, lora_list):
+    lora_list = list(lora_list)  # Convert iterator to list so we can iterate multiple times
     if not lora_list: return
     try:
-        high_node, low_node = None, None
-        for nid, node in find_nodes_by_class(graph, "LoraLoaderModelOnly"):
-            if "high_noise.safetensors" in str(node.get("inputs", {}).get("lora_name", "")): high_node = node
-            if "low_noise.safetensors" in str(node.get("inputs", {}).get("lora_name", "")): low_node = node
-        if not high_node: return
+        # Find UNet loaders by title
+        high_unet_nid, _ = first_node_by_title(graph, "HighNoiseUnet")
+        low_unet_nid, _ = first_node_by_title(graph, "LowNoiseUnet")
+        
+        if not high_unet_nid:
+            print("[WARN] HighNoiseUnet not found, skipping LoRA injection")
+            return
+        
+        # Find all nodes whose model input points to a given node
+        # def find_downstream(source_nid):
+        #     results = []
+        #     for nid, node in graph.items():
+        #         if not isinstance(node, dict): continue
+        #         model_input = node.get("inputs", {}).get("model")
+        #         if isinstance(model_input, list) and str(model_input[0]) == str(source_nid):
+        #             results.append((nid, node))
+        #     return results
 
-        curr_high = high_node["inputs"]["model"]
-        curr_low = low_node["inputs"]["model"] if low_node else None
 
-        for (name, strength_str) in lora_list:
-            try: s = float(strength_str)
-            except: continue
-            
-            # high_file, low_file, do_low = name.strip(), None, False
-            # for entry in LORA_REGISTRY:
-            #     if name.strip() in entry["triggers"]:
-            #         high_file, low_file, do_low = entry["high"], entry["low"], True
-            #         break
-            high_file, low_file, do_low = resolve_lora_pair(name)
-
-            nid_h = new_node_id(graph)
-            graph[nid_h] = {"inputs": {"lora_name": high_file, "strength_model": s, "model": curr_high}, "class_type": "LoraLoaderModelOnly", "_meta": {"title": f"Injected_High_{high_file}"}}
-            curr_high = [nid_h, 0]
-
-            if do_low and curr_low:
-                nid_l = new_node_id(graph)
-                graph[nid_l] = {"inputs": {"lora_name": low_file, "strength_model": s, "model": curr_low}, "class_type": "LoraLoaderModelOnly", "_meta": {"title": f"Injected_Low_{low_file}"}}
-                curr_low = [nid_l, 0]
-            print(f"[INJECT] {name} -> High:{high_file} Low:{low_file if do_low else 'Skip'}")
-
-        high_node["inputs"]["model"] = curr_high
-        if low_node and curr_low: low_node["inputs"]["model"] = curr_low
+        # Find all nodes whose model input points to a given node
+        def find_downstream(source_nid):
+            results = []
+            print(f"[DEBUG] find_downstream looking for source_nid={source_nid} (type={type(source_nid).__name__})")
+            for nid, node in graph.items():
+                if not isinstance(node, dict): continue
+                model_input = node.get("inputs", {}).get("model")
+                if isinstance(model_input, list):
+                    print(f"[DEBUG]   Node {nid} has model[0]={model_input[0]} (type={type(model_input[0]).__name__})")
+                    if str(model_input[0]) == str(source_nid):
+                        title = node.get("_meta", {}).get("title", "?")
+                        print(f"[DEBUG]   ^^^ MATCH: {title}")
+                        results.append((nid, node))
+            print(f"[DEBUG] find_downstream found {len(results)} nodes")
+            return results
+        
+        # Build a LoRA chain from source, return final reference
+        def build_chain(source_ref, noise_type):
+            curr = source_ref
+            for (name, strength_str) in lora_list:
+                try: s = float(strength_str)
+                except: continue
+                high_file, low_file = resolve_lora_pair(name)
+                lora_file = high_file if noise_type == "high" else low_file
+                if lora_file:
+                    nid = new_node_id(graph)
+                    graph[nid] = {
+                        "inputs": {"lora_name": lora_file, "strength_model": s, "model": curr},
+                        "class_type": "LoraLoaderModelOnly",
+                        "_meta": {"title": f"Injected_{noise_type.title()}_{lora_file}"}
+                    }
+                    curr = [nid, 0]
+            return curr
+        
+        # Inject into all high-noise paths
+        for nid, node in find_downstream(high_unet_nid):
+            chain_end = build_chain([high_unet_nid, 0], "high")
+            node["inputs"]["model"] = chain_end
+            target_name = node.get("_meta", {}).get("title", nid)
+            print(f"[INJECT] High LoRA chain -> {target_name}")
+        
+        # Inject into all low-noise paths
+        if low_unet_nid:
+            for nid, node in find_downstream(low_unet_nid):
+                chain_end = build_chain([low_unet_nid, 0], "low")
+                node["inputs"]["model"] = chain_end
+                target_name = node.get("_meta", {}).get("title", nid)
+                print(f"[INJECT] Low LoRA chain -> {target_name}")
+        
+        # Log what was injected
+        for (name, _) in lora_list:
+            high_file, low_file = resolve_lora_pair(name)
+            print(f"[INJECT] {name} -> High:{high_file or 'Skip'} Low:{low_file or 'Skip'}")
+        
     except Exception as e: print(f"[WARN] Failed to inject LoRAs: {e}")
 
-def inject_slowmo_fix(graph: dict, target_steps: int, primer_steps: int, primer_cfg: float, main_cfg: float):
-    try:
-        iter_nid, iter_node = first_node_by_title(graph, "IterKSampler")
-        fixed_nid, fixed_node = first_node_by_title(graph, "WanFixedSeed")
-        steps_nid, _ = first_node_by_title(graph, "Steps (Final)")
-        if not (iter_node and fixed_node and steps_nid): return
 
-        orig_latent = iter_node["inputs"]["latent_image"]
-        lora_model_nid = iter_node["inputs"]["model"][0]
-        base_model_nid = graph[lora_model_nid]["inputs"]["model"][0]
-        shift_val = graph[lora_model_nid]["inputs"].get("shift", 5.0)
 
-        base_samp_nid = new_node_id(graph)
-        graph[base_samp_nid] = {"inputs": {"shift": shift_val, "model": graph[base_model_nid]["inputs"]["model"]}, "class_type": "ModelSamplingSD3", "_meta": {"title": "Injected_Base_Samp"}}
+# def inject_prompt_loras(graph: dict, lora_list: list):
+#     if not lora_list: return
+#     try:
+#         high_node, low_node = None, None
+#         for nid, node in find_nodes_by_class(graph, "LoraLoaderModelOnly"):
+#             if "high_noise.safetensors" in str(node.get("inputs", {}).get("lora_name", "")): high_node = node
+#             if "low_noise.safetensors" in str(node.get("inputs", {}).get("lora_name", "")): low_node = node
+#         if not high_node: return
 
-        fix_nid = new_node_id(graph)
-        graph[fix_nid] = {
-            "inputs": {
-                "add_noise": "enable", "noise_seed": iter_node["inputs"].get("noise_seed", 0),
-                "steps": [steps_nid, 0], "cfg": primer_cfg, "sampler_name": iter_node["inputs"].get("sampler_name", "euler"),
-                "scheduler": iter_node["inputs"].get("scheduler", "simple"), "start_at_step": 0, "end_at_step": primer_steps,
-                "return_with_leftover_noise": "enable", "model": [base_samp_nid, 0],
-                "positive": iter_node["inputs"]["positive"], "negative": iter_node["inputs"]["negative"], "latent_image": orig_latent
-            },
-            "class_type": "KSamplerAdvanced", "_meta": {"title": "Injected_SlowMo_Fix"}
-        }
+#         curr_high = high_node["inputs"]["model"]
+#         curr_low = low_node["inputs"]["model"] if low_node else None
 
-        mid = ((target_steps - primer_steps) // 2) + primer_steps
-        iter_node["inputs"]["latent_image"] = [fix_nid, 0]
-        iter_node["inputs"]["start_at_step"] = primer_steps
-        iter_node["inputs"]["end_at_step"] = mid
-        iter_node["inputs"]["cfg"] = main_cfg
-        iter_node["inputs"]["add_noise"] = "disable"
+#         for (name, strength_str) in lora_list:
+#             try: s = float(strength_str)
+#             except: continue
+#             high_file, low_file = resolve_lora_pair(name)
+
+#             if high_file:
+#                 nid_h = new_node_id(graph)
+#                 graph[nid_h] = {"inputs": {"lora_name": high_file, "strength_model": s, "model": curr_high}, "class_type": "LoraLoaderModelOnly", "_meta": {"title": f"Injected_High_{high_file}"}}
+#                 curr_high = [nid_h, 0]
+
+#             if low_file and curr_low:
+#                 nid_l = new_node_id(graph)
+#                 graph[nid_l] = {"inputs": {"lora_name": low_file, "strength_model": s, "model": curr_low}, "class_type": "LoraLoaderModelOnly", "_meta": {"title": f"Injected_Low_{low_file}"}}
+#                 curr_low = [nid_l, 0]
+#             print(f"[INJECT] {name} -> High:{high_file or 'Skip'} Low:{low_file or 'Skip'}")
+
+#         high_node["inputs"]["model"] = curr_high
+#         if low_node and curr_low: low_node["inputs"]["model"] = curr_low
+#     except Exception as e: print(f"[WARN] Failed to inject LoRAs: {e}")
+
+# def inject_slowmo_fix(graph: dict, target_steps: int, primer_steps: int, primer_cfg: float, main_cfg: float):
+#     try:
+#         iter_nid, iter_node = first_node_by_title(graph, "IterKSampler")
+#         fixed_nid, fixed_node = first_node_by_title(graph, "WanFixedSeed")
+#         steps_nid, _ = first_node_by_title(graph, "Steps (Final)")
+#         if not (iter_node and fixed_node and steps_nid): return
+
+#         orig_latent = iter_node["inputs"]["latent_image"]
+#         lora_model_nid = iter_node["inputs"]["model"][0]
+#         base_model_nid = graph[lora_model_nid]["inputs"]["model"][0]
+#         shift_val = graph[lora_model_nid]["inputs"].get("shift", 5.0)
+
+#         base_samp_nid = new_node_id(graph)
+#         graph[base_samp_nid] = {"inputs": {"shift": shift_val, "model": graph[base_model_nid]["inputs"]["model"]}, "class_type": "ModelSamplingSD3", "_meta": {"title": "Injected_Base_Samp"}}
+
+#         fix_nid = new_node_id(graph)
+#         graph[fix_nid] = {
+#             "inputs": {
+#                 "add_noise": "enable", "noise_seed": iter_node["inputs"].get("noise_seed", 0),
+#                 "steps": [steps_nid, 0], "cfg": primer_cfg, "sampler_name": iter_node["inputs"].get("sampler_name", "euler"),
+#                 "scheduler": iter_node["inputs"].get("scheduler", "simple"), "start_at_step": 0, "end_at_step": primer_steps,
+#                 "return_with_leftover_noise": "enable", "model": [base_samp_nid, 0],
+#                 "positive": iter_node["inputs"]["positive"], "negative": iter_node["inputs"]["negative"], "latent_image": orig_latent
+#             },
+#             "class_type": "KSamplerAdvanced", "_meta": {"title": "Injected_SlowMo_Fix"}
+#         }
+
+#         mid = ((target_steps - primer_steps) // 2) + primer_steps
+#         iter_node["inputs"]["latent_image"] = [fix_nid, 0]
+#         iter_node["inputs"]["start_at_step"] = primer_steps
+#         iter_node["inputs"]["end_at_step"] = mid
+#         iter_node["inputs"]["cfg"] = main_cfg
+#         iter_node["inputs"]["add_noise"] = "disable"
         
-        fixed_node["inputs"]["start_at_step"] = mid
-        fixed_node["inputs"]["end_at_step"] = target_steps
-        fixed_node["inputs"]["cfg"] = main_cfg
-        print(f"[INJECT] SlowMo Fix applied. Primer:{primer_steps} Mid:{mid} Total:{target_steps}")
-    except Exception as e: print(f"[WARN] SlowMo Fix failed: {e}")
+#         fixed_node["inputs"]["start_at_step"] = mid
+#         fixed_node["inputs"]["end_at_step"] = target_steps
+#         fixed_node["inputs"]["cfg"] = main_cfg
+#         print(f"[INJECT] SlowMo Fix applied. Primer:{primer_steps} Mid:{mid} Total:{target_steps}")
+#     except Exception as e: print(f"[WARN] SlowMo Fix failed: {e}")
 
 def inject_metadata_mp4(video_path, snapshot):
     try:
@@ -704,9 +782,13 @@ def run(config_path, export_only=False, status_file_override=None):
     express_video = bool(get(project, "inbetween_generation", "express_video", default=False))
     quarter_size_video = bool(get(project, "inbetween_generation", "quarter_size_video", default=False))
     upscale_video = bool(get(project, "inbetween_generation", "upscale_video", default=DEFAULT_UPSCALE))
-    fix_slowmo = bool(get(project, "inbetween_generation", "fix_slowmo", default=DEFAULT_SLOMOFIX))
-    fix_primer = float(get(project, "inbetween_generation", "fix_slowmo_primer_cfg", default=DEFAULT_SLOMOFIX_CFG))
-    fix_main = float(get(project, "inbetween_generation", "fix_slowmo_main_cfg", default=1.0))
+    # fix_slowmo = bool(get(project, "inbetween_generation", "fix_slowmo", default=DEFAULT_SLOMOFIX))
+    # fix_primer = float(get(project, "inbetween_generation", "fix_slowmo_primer_cfg", default=DEFAULT_SLOMOFIX_CFG))
+    # fix_main = float(get(project, "inbetween_generation", "fix_slowmo_main_cfg", default=1.0))
+
+
+
+
 
     try:
         g = jload(wf_path)
@@ -846,45 +928,39 @@ def run(config_path, export_only=False, status_file_override=None):
                         else:
                             print("[WORKFLOW TYPE] WAN 2.2")
 
-                        # # Setup workflow
-                        # if upscale_video: inject_film_vfi_upscaler(graph)
-                        # inject_frame_save_node(graph, f_pre)
-                        
-                        # t_steps = EXPRESS_STEPS if express_video else FULL_STEPS
-                        # if fix_slowmo: t_steps += PRIMER_STEPS
-                        
-                        # # Apply Steps
-                        # snodes = find_nodes_by_title(graph, "Steps (Final)")
-                        # if snodes: snodes[0][1].setdefault("inputs", {})["value"] = int(t_steps)
-                        
-                        # if fix_slowmo: inject_slowmo_fix(graph, t_steps, PRIMER_STEPS, fix_primer, fix_main)
-                        # else:
-                        #     mid = t_steps // 2
-                        #     itn = find_nodes_by_title(graph, "IterKSampler")
-                        #     if itn: set_if_exists(itn[0][1], "start_at_step", 0); set_if_exists(itn[0][1], "end_at_step", mid)
-                        #     fxn = find_nodes_by_title(graph, "WanFixedSeed")
-                        #     if fxn: set_if_exists(fxn[0][1], "start_at_step", mid); set_if_exists(fxn[0][1], "end_at_step", t_steps)
-                        # Setup workflow
-                        # is_ltx2 = graph.get('_is_ltx2', False)
                         
                         if not is_ltx2:
                             if upscale_video: inject_film_vfi_upscaler(graph)
                             inject_frame_save_node(graph, f_pre)
-                            
                             t_steps = EXPRESS_STEPS if express_video else FULL_STEPS
-                            if fix_slowmo: t_steps += PRIMER_STEPS
+                            t_steps += PRIMER_STEPS
+                            mid = ((t_steps - PRIMER_STEPS) // 2) + PRIMER_STEPS
                             
-                            # Apply Steps
-                            snodes = find_nodes_by_title(graph, "Steps (Final)")
-                            if snodes: snodes[0][1].setdefault("inputs", {})["value"] = int(t_steps)
+                            # Update all three samplers with correct step ranges
+                            for _, node in find_nodes_by_title(graph, "SlowMoPrimer"):
+                                set_if_exists(node, "steps", t_steps)
+                            for _, node in find_nodes_by_title(graph, "IterKSampler"):
+                                set_if_exists(node, "steps", t_steps)
+                                set_if_exists(node, "start_at_step", PRIMER_STEPS)
+                                set_if_exists(node, "end_at_step", mid)
+                            for _, node in find_nodes_by_title(graph, "WanFixedSeed"):
+                                set_if_exists(node, "steps", t_steps)
+                                set_if_exists(node, "start_at_step", mid)
+                                set_if_exists(node, "end_at_step", t_steps)
+                            # t_steps = EXPRESS_STEPS if express_video else FULL_STEPS
+                            # if fix_slowmo: t_steps += PRIMER_STEPS
                             
-                            if fix_slowmo: inject_slowmo_fix(graph, t_steps, PRIMER_STEPS, fix_primer, fix_main)
-                            else:
-                                mid = t_steps // 2
-                                itn = find_nodes_by_title(graph, "IterKSampler")
-                                if itn: set_if_exists(itn[0][1], "start_at_step", 0); set_if_exists(itn[0][1], "end_at_step", mid)
-                                fxn = find_nodes_by_title(graph, "WanFixedSeed")
-                                if fxn: set_if_exists(fxn[0][1], "start_at_step", mid); set_if_exists(fxn[0][1], "end_at_step", t_steps)
+                            # # Apply Steps
+                            # snodes = find_nodes_by_title(graph, "Steps (Final)")
+                            # if snodes: snodes[0][1].setdefault("inputs", {})["value"] = int(t_steps)
+                            
+                            # if fix_slowmo: inject_slowmo_fix(graph, t_steps, PRIMER_STEPS, fix_primer, fix_main)
+                            # else:
+                            #     mid = t_steps // 2
+                            #     itn = find_nodes_by_title(graph, "IterKSampler")
+                            #     if itn: set_if_exists(itn[0][1], "start_at_step", 0); set_if_exists(itn[0][1], "end_at_step", mid)
+                            #     fxn = find_nodes_by_title(graph, "WanFixedSeed")
+                            #     if fxn: set_if_exists(fxn[0][1], "start_at_step", mid); set_if_exists(fxn[0][1], "end_at_step", t_steps)
                         else:
                             # LTX-2: Steps controlled by scheduler, not manually
                             t_steps = 0  # Placeholder for logging
@@ -912,18 +988,6 @@ def run(config_path, export_only=False, status_file_override=None):
                         for n in find_nodes_by_title(graph, "PosPrompt"): set_if_exists(n[1], "text", pclean)
                         for n in find_nodes_by_title(graph, "NegPrompt"): set_if_exists(n[1], "text", neg_text)
 
-                        # Wire
-                        # l1, l2 = ensure_two_loaders(graph)
-                        # if sp: set_loader_path(graph[l1], sp)
-                        # if ep: set_loader_path(graph[l2], ep)
-                        
-                        # wi, hi = (half_w, half_h) if quarter_size_video else (full_w, full_h)
-                        # try:
-                        #     wire_half_to_wan(graph, ctype, l1, l2, wi, hi)
-                        #     set_wan_size(graph, wi, hi)
-                        # except Exception as e: print(f"[ERR] Wiring failed: {e}"); continue
-                        # Wire
-                        # is_ltx2 = graph.get('_is_ltx2', False)
                         
                         if is_ltx2:
                             # LTX-2: Direct image path update

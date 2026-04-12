@@ -1527,7 +1527,7 @@ def build_export_panel(scope="project"):
         c["format"] = gr.Radio(["MP4", "GIF"], label="Format", value="MP4")
         c["resize"] = gr.Checkbox(label="Resize to Project", info="Enforce final size to be project size (not needed with Quarter Size video used)", value=False, visible=False)
         c["fps"] = gr.Radio(["Default", "2x Default"], info="Use 2x to correct speed when exporting 2xf version", label="FPS", value="Default")
-        c["audio_dd"] = gr.Dropdown(label="Audio", info="Select any uploaded audio to attach to exported mp4", choices=[], interactive=True)
+        c["audio_dd"] = gr.Dropdown(label="Audio", info="Select any uploaded audio to attach to exported mp4", allow_custom_value=False, filterable=False,choices=[], interactive=True)
         c["audio_upload"] = gr.UploadButton("Upload Audio")
         c["log"] = gr.Textbox(label="Log", lines=4, visible=False)
         c["history_dd"] = gr.Dropdown(label="History", info="Re-download previous exports", choices=[], visible=False)

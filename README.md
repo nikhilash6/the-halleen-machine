@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.8 Beta**  
+**Version 0.9.9 Candidate**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -14,9 +14,9 @@ Organize AI video projects into structured timelines. Create reusable asset libr
 
 - Python 3.11+ 
 - ComfyUI installed and running
-- Custom ComfyUI nodes installed, see COMFYUI_INSTALL_GUIDE.md
+- Custom ComfyUI nodes installed, see COMFYUI_INTEGRATION_GUIDE.md
 
-## If you do not have ComfyUI running, refer instead to COMFYUI_INSTALL_GUIDE.md which covers installing both ComfyUI and The Halleen Machine
+## If you do not have ComfyUI running, refer instead to COMFYUI_INTEGRATION_GUIDE.md which covers installing both ComfyUI and The Halleen Machine
 
 
 ---
@@ -41,15 +41,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Configure
-python setup.py
-# or
-cp config.toml.example config.toml
-# Then edit config.toml with your ComfyUI paths
-
 # Setup may recommend additional model dowloads and will give instructions
+python setup.py
 
-# Refer to COMFYUI_INSTALL_GUIDE.md Phase 2 and 3 for dependencies
-
+# Refer to COMFYUI_INTEGRATION_GUIDE.md Phase 2 and 3 for dependencies
+echo "Don't forget to resolve dependencies found in COMFYUI_INTEGRATION_GUIDE.md"
 
 # Launch
 python app.py --listen 0.0.0.0 --port 7860
@@ -60,15 +56,29 @@ python app.py --listen 0.0.0.0 --port 7860
 
 ## Learning More
 
-**Tutorials and guides:**  (coming soon)
+**Tutorials and guides:** 
 https://www.youtube.com/halleen
 
 ---
 
-## Beta Status
+## Known Bugs
 
-- Minor bugs 
-- Pre-launch (before samples and how-to videos have been published)
+**Don't navigate too fast** 
+If you click too quickly between nodes you can get data corruption.  Long term fix is to migrate away from Gradio.
+
+**Don't generate while a batch is running** 
+If a batch is in progress, it's best to leave those items alone.  There are cases where the mp4 from one generation will be created as expected, but the individual frames are put in the folder of another generation.  It can be manually repaired but blocks upscale or export of that media.  Long term fix: revisions to the batch and queue system overall.
+
+
+## Road Map
+
+**Short term** 
+Expand beyond the SDXL and Wan2.2 ecosystem
+Batch quality of life improvements (status, task canceling, queue stability)
+Minor UX improvements
+
+**Long term**
+Replace Gradio with another front end framework
 
 ---
 

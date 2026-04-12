@@ -460,6 +460,14 @@ custom_css = """
 }
 
 
+.constrained-video video {
+    max-width: 100%;
+    max-height: 60vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
 """
 
 with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
@@ -513,11 +521,13 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
     </script>
     """)
 
+    # NEW: Form Registry
+    form = ProjectFormRegistry()
 
     with gr.Row(elem_id="header-row"):
         # Column 1: Title block
         with gr.Column(scale=1, min_width=300):
-            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.8</small>", elem_id="app-title")
+            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.9</small>", elem_id="app-title")
             project_name_header = gr.Markdown("", elem_id="project-path-display")
         
         # Column 2: Utility cluster
@@ -525,6 +535,9 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
             with gr.Row(elem_classes=["header-utility-row"]):
                 comfyui_status_md = gr.Markdown(elem_id="status_indicator")
                 refresh_all_btn = gr.Button("Refresh Data", variant="secondary", size="sm", elem_id="header-refresh-btn", visible=False)
+                # vid_express = form.add("project.inbetween_generation.express_video", 
+                #     gr.Checkbox(label="Rough Draft", info="Low fidelity but fast for initial validation"), 
+                #     default=False)
 
     # Shared state
     settings_json     = gr.State(value=settings_json_init)
@@ -533,8 +546,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
     # PHASE 3: Removed json_load_buffer and temp_file_path_buffer - no longer needed
     lora_file_state   = gr.State(value=["__initializing__"])
 
-    # NEW: Form Registry
-    form = ProjectFormRegistry()
+
 
     with gr.Tabs() as main_tabs:
 
@@ -572,8 +584,8 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
                             default="5", to_ui=_dur_to_choice, to_json=int)
                     with gr.Column():
                         vid_express = form.add("project.inbetween_generation.express_video", 
-                            gr.Checkbox(label="Faster Video Generation", info="Fewer steps, lower quality"), 
-                            default=True)
+                            gr.Checkbox(label="Rough Draft", info="Low fidelity but fast for initial validation"), 
+                            default=False)
                 
                 # gr.Markdown("### LoRA Normalization")
                 with gr.Row():

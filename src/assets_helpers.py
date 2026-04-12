@@ -93,10 +93,10 @@ POSE_NEGATIVE_ENHANCED = "text, watermark, camera, tripod, light stand, celebrit
 POSE_GEN_CHARACTER_OVERRIDE_ENHANCED = ""
 
 POSE_GEN_SETTING_OVERRIDE_ONE = "exactly one person"
-POSE_GEN_SETTING_OVERRIDE_TWO = "exactly two people, balanced framing, characters are separated into left and right halves of the frame "
+POSE_GEN_SETTING_OVERRIDE_TWO = "exactly two people, balanced framing, characters are separated into left and right sides "
 # POSE_GEN_CHARACTER_OVERRIDE = "body suit, natural proportions, pose model"
 POSE_GEN_NEGATIVE_ONE = "(((more than one person))) extra limbs, distorted bodies"
-POSE_GEN_NEGATIVE_TWO = "(((more than two people))) comic book panels, extra limbs, distorted bodies, vertical line, line in the middle of the frame, divider"
+POSE_GEN_NEGATIVE_TWO = "(((more than two people))) comic book panels, extra limbs, distorted bodies, vertical line, line in the middle, divider"
 
 
 

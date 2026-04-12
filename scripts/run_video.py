@@ -952,7 +952,7 @@ def run(config_path, export_only=False, status_file_override=None):
 
                         vid_seed_override = vid_conf.get("seed_start")
                         effective_seed_start = int(vid_seed_override) if vid_seed_override is not None else seed_start
-                        seed = effective_seed_start + it * seed_step
+                        seed = effective_seed_start + it * seed_step   ## set here to fix
                         sp = get(ibase, start_id, "selected_image_path") if ctype in ("SE","SO") else None
                         ep = get(ibase, end_id, "selected_image_path") if ctype in ("OE","SE") else None
                         
@@ -978,35 +978,28 @@ def run(config_path, export_only=False, status_file_override=None):
                         if not is_ltx2:
                             if upscale_video: inject_film_vfi_upscaler(graph)
                             inject_frame_save_node(graph, f_pre)
-                            t_steps = EXPRESS_STEPS if express_video else FULL_STEPS
-                            t_steps += PRIMER_STEPS
-                            mid = ((t_steps - PRIMER_STEPS) // 2) + PRIMER_STEPS
+                            
+                            # High-noise steps stay constant; express only trims low-noise
+                            # Full:    Primer 0→2, Iter 2→8, Fixed 8→14 (14 total)
+                            # Express: Primer 0→2, Iter 2→8, Fixed 8→10 (10 total)
+                            PRIMER_END = 2
+                            ITER_END = 7 if express_video else 8
+                            t_steps = 7 if express_video else 14
                             
                             # Update all three samplers with correct step ranges
                             for _, node in find_nodes_by_title(graph, "SlowMoPrimer"):
                                 set_if_exists(node, "steps", t_steps)
+                                set_if_exists(node, "start_at_step", 0)
+                                set_if_exists(node, "end_at_step", PRIMER_END)
                             for _, node in find_nodes_by_title(graph, "IterKSampler"):
                                 set_if_exists(node, "steps", t_steps)
-                                set_if_exists(node, "start_at_step", PRIMER_STEPS)
-                                set_if_exists(node, "end_at_step", mid)
+                                set_if_exists(node, "start_at_step", PRIMER_END)
+                                set_if_exists(node, "end_at_step", ITER_END)
                             for _, node in find_nodes_by_title(graph, "WanFixedSeed"):
                                 set_if_exists(node, "steps", t_steps)
-                                set_if_exists(node, "start_at_step", mid)
+                                set_if_exists(node, "start_at_step", ITER_END)
                                 set_if_exists(node, "end_at_step", t_steps)
-                            # t_steps = EXPRESS_STEPS if express_video else FULL_STEPS
-                            # if fix_slowmo: t_steps += PRIMER_STEPS
-                            
-                            # # Apply Steps
-                            # snodes = find_nodes_by_title(graph, "Steps (Final)")
-                            # if snodes: snodes[0][1].setdefault("inputs", {})["value"] = int(t_steps)
-                            
-                            # if fix_slowmo: inject_slowmo_fix(graph, t_steps, PRIMER_STEPS, fix_primer, fix_main)
-                            # else:
-                            #     mid = t_steps // 2
-                            #     itn = find_nodes_by_title(graph, "IterKSampler")
-                            #     if itn: set_if_exists(itn[0][1], "start_at_step", 0); set_if_exists(itn[0][1], "end_at_step", mid)
-                            #     fxn = find_nodes_by_title(graph, "WanFixedSeed")
-                            #     if fxn: set_if_exists(fxn[0][1], "start_at_step", mid); set_if_exists(fxn[0][1], "end_at_step", t_steps)
+
                         else:
                             # LTX-2: Steps controlled by scheduler, not manually
                             t_steps = 0  # Placeholder for logging
@@ -1090,13 +1083,32 @@ def run(config_path, export_only=False, status_file_override=None):
                             pid = post_prompt(api_base, graph)
                             if wait_history_done(api_base, pid, timeout_s):
                                 completed_iters += 1
+                                snapshot_vid_data = dict(vid_conf)
+                                snapshot_vid_data["inbetween_prompt"] = pclean
+                                
+                                # snap = {
+                                #     "item_data": snapshot_vid_data,
+                                #     "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
+                                #     "project_context": {"model": project.get("model"), "width": full_w, "height": full_h},
+                                #     "generation": {"seed": seed, "steps": t_steps, "fps": project_fps},
+                                #     "meta": {"timestamp": datetime.now().isoformat()}
+                                # }
                                 snap = {
                                     "item_data": vid_conf,
                                     "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
-                                    "project_context": {"model": project.get("model"), "width": full_w, "height": full_h},
-                                    "generation": {"seed": seed, "steps": t_steps, "fps": project_fps},
+                                    "project_context": {"model": project.get("model"), "width": full_w, "height": full_h, "steps": t_steps, "fps": project_fps},
+                                    "generation": {"seed": seed, "executed_prompt": ptxt},
                                     "meta": {"timestamp": datetime.now().isoformat()}
                                 }
+
+
+                                # snap = {
+                                #     "item_data": vid_conf,
+                                #     "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
+                                #     "project_context": {"model": project.get("model"), "width": full_w, "height": full_h},
+                                #     "generation": {"seed": seed, "steps": t_steps, "fps": project_fps},
+                                #     "meta": {"timestamp": datetime.now().isoformat()}
+                                # }
                                 cands = list_videos_with_prefix(vid_folder, base_name)
                                 if cands:
                                     cands.sort(key=lambda f: os.path.getmtime(f), reverse=True)

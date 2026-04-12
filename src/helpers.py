@@ -138,7 +138,7 @@ DEFAULT_PROJECT = {
             "advance_seed_by": 1,
             "seed_target_title": "IterKSampler",
             "seed_exclude_title": "WanFixedSeed",
-            "express_video": True,
+            "express_video": False,
             "quarter_size_video": True,
             "lora_normalization_enabled": True,
             "lora_normalization_max": 1.5
@@ -1021,14 +1021,26 @@ def validate_before_save(data: dict, filepath: str):
     
     return True, "OK"
 
+# Global debounce tracking
+LAST_SAVE_TIME = {}
+SAVE_DEBOUNCE_MS = 500  # Minimum 100ms between saves to same file
+
 def cb_save_project(current_file_path: str, current_project: dict, settings_json: str):
     """
     PHASE 2A NOTE: Accepts dict but has defensive isinstance check during migration.
     The isinstance check will be removed in Phase 2D.
     """
+    import time
+    
     if not (current_file_path or '').strip(): return
     if isinstance(current_project, (list, tuple)) and current_project: current_project = current_project[0]
     
+    # Debounce: Skip if saved too recently
+    current_time = time.time() * 1000  # milliseconds
+    last_save = LAST_SAVE_TIME.get(current_file_path, 0)
+    if current_time - last_save < SAVE_DEBOUNCE_MS:
+        return  # Skip this save, too soon
+    LAST_SAVE_TIME[current_file_path] = current_time
     
     if not isinstance(current_project, dict): return
     try:

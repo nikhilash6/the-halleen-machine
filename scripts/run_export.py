@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Tuple
 
 # --- Constants and Helpers ---
 
-TRIM_SE_EACH_SIDE = 1
+TRIM_SE_EACH_SIDE = 2
 TRIM_O_ONE_SIDE   = 1
 GENEROUS_ASSET_SIXTEENTHS = 2000
 

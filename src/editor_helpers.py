@@ -49,6 +49,16 @@ from helpers import (
 
 # ---- INTERNAL HELPERS ----
 
+def _check_ownership(data: dict, loaded_nid: str, loaded_proj: str) -> bool:
+    """Returns True if save should proceed (same project), False to skip."""
+    if not loaded_nid:
+        return False
+    current_proj = data.get("project", {}).get("name", "")
+    if loaded_proj and current_proj and loaded_proj != current_proj:
+        print(f"[OWNERSHIP] Skipping save: project changed from '{loaded_proj}' to '{current_proj}'")
+        return False
+    return True
+
 def _resolve_node_context(data: Dict[str, Any], node_id: str) -> Tuple[Dict[str, Any] | None, str | None, Dict[str, Any] | None, str | None]:
     """
     Resolves an ID to (node, type, parent_sequence, parent_sequence_id).
@@ -1033,6 +1043,127 @@ def _read_metadata_png(path: str) -> dict | None:
         print(f"Error reading PNG metadata: {e}")
         return None
 
+def _format_cn_settings(cn: dict) -> str:
+    """Format CN settings: 'Pose 0.8/1.0, Shape 0.5/0.5' (omit if off)"""
+    parts = []
+    labels = {"1": "Pose", "2": "Shape", "3": "Outline"}
+    for idx, label in labels.items():
+        unit = cn.get(idx, {})
+        if unit.get("switch") == "On":
+            strength = unit.get("strength", 1.0)
+            end = unit.get("end_percent", 1.0)
+            parts.append(f"{label} {strength}/{end}")
+    return ", ".join(parts) if parts else "None"
+
+def _format_lora_norm(lora_norm: dict) -> str:
+    """Format LoRA normalization: 'Foregrounds 1.0, Backgrounds 0.8' (omit if off)"""
+    parts = []
+    if lora_norm.get("fg_enabled"):
+        parts.append(f"Foregrounds {lora_norm.get('fg_max', 1.0)}")
+    if lora_norm.get("bg_enabled"):
+        parts.append(f"Backgrounds {lora_norm.get('bg_max', 1.0)}")
+    return ", ".join(parts) if parts else "None"
+
+def _merge_negatives(*parts) -> str:
+    """Merge negative prompt parts, filtering empty strings."""
+    return ", ".join(p.strip() for p in parts if p and p.strip())
+
+def _eh_load_execution_info_kf(selected_path: str):
+    """Load execution info from image metadata and format as Markdown."""
+    if not selected_path:
+        return gr.update(value="*No file selected*")
+    snapshot = _read_metadata_png(selected_path)
+    if not snapshot:
+        return gr.update(value="*No metadata found*")
+    
+    gen = snapshot.get("generation", {})
+    proj = snapshot.get("project_context", {})
+    item = snapshot.get("item_data", {})
+    
+    seed = gen.get("seed", "")
+    prompt = (gen.get("executed_prompt", "") or "").replace("__", r"\_\_")
+    steps = proj.get("steps", "")
+    cfg = proj.get("cfg", "")
+    sampler = proj.get("sampler", "")
+    scheduler = proj.get("scheduler", "")
+    model = proj.get("model", "")
+    # timestamp = snapshot.get("meta", {}).get("timestamp", "")
+    pose = item.get("pose", "")
+    
+    # CN settings
+    cn = item.get("controlnet_settings", {})
+    cn_str = _format_cn_settings(cn)
+    
+    # LoRA normalization
+    lora_norm = proj.get("lora_normalization", {})
+    lora_str = _format_lora_norm(lora_norm)
+    
+    # Combined negatives (recompute from parts)
+    proj_negs = proj.get("negatives", {})
+    item_negs = item.get("negatives", {})
+    combined_neg = _merge_negatives(
+        proj_negs.get("global", ""),
+        proj_negs.get("keyframes_all", ""),
+        item_negs.get("heal", "") if isinstance(item_negs, dict) else ""
+    )
+    
+    lines = [
+        f"**Seed:** {seed}",
+        f"**Prompt:** {prompt}",
+        f"**Steps:** {steps} | **CFG:** {cfg} | **Sampler:** {sampler} | **Scheduler:** {scheduler}",
+        f"**Model:** {model}",
+        # f"**Timestamp:** {timestamp}",
+        f"**Pose:** {pose}",
+        f"**ControlNet:** {cn_str}",
+        f"**LoRA Norm:** {lora_str}",
+        f"**Negatives:** {combined_neg}",
+    ]
+    
+    # 2CHAR: add left/right/heal negatives if present
+    if isinstance(item_negs, dict) and (item_negs.get("left") or item_negs.get("right") or item_negs.get("heal")):
+        lines.append("")
+        lines.append("**Character Negatives:**")
+        if item_negs.get("left"):
+            lines.append(f"- Left: {item_negs['left']}")
+        if item_negs.get("right"):
+            lines.append(f"- Right: {item_negs['right']}")
+        if item_negs.get("heal"):
+            lines.append(f"- Heal: {item_negs['heal']}")
+    
+    return gr.update(value="  \n".join(lines))
+
+def _eh_load_execution_info_vid(selected_path: str):
+    """Load execution info from video metadata and format as Markdown."""
+    if not selected_path:
+        return gr.update(value="*No file selected*")
+    snapshot = _read_metadata_mp4(selected_path)
+    if not snapshot:
+        return gr.update(value="*No metadata found*")
+    
+    gen = snapshot.get("generation", {})
+    proj = snapshot.get("project_context", {})
+    item = snapshot.get("item_data", {})
+    
+    seed = gen.get("seed", "")
+    prompt = (gen.get("executed_prompt", "") or "").replace("__", r"\_\_")
+    steps = proj.get("steps", "")
+    
+    # Combined negatives (recompute)
+    combined_neg = _merge_negatives(
+        proj.get("negatives", {}).get("global", "") if isinstance(proj.get("negatives"), dict) else "",
+        proj.get("negatives", {}).get("inbetween_all", "") if isinstance(proj.get("negatives"), dict) else "",
+        item.get("negative_prompt", "")
+    )
+    
+    lines = [
+        f"**Seed:** {seed}",
+        f"**Prompt:** {prompt}",
+        f"**Steps:** {steps}",
+        f"**Negatives:** {combined_neg}",
+    ]
+    
+    return gr.update(value="  \n".join(lines))
+
 def _read_metadata_mp4(path: str) -> dict | None:
     try:
         if not path or not os.path.exists(path): return None
@@ -1262,12 +1393,14 @@ def _eh_move_keyframe_down(project_dict: dict, nid: str):
     return data, left, sel, proj
 
 
-def _eh_open_flag(project_dict: dict, nid: str, which: str, value: bool):
-    # data = _ensure_project(_loads(project_dict))
+def _eh_open_flag(project_dict: dict, loaded_nid: str, loaded_proj: str, which: str, value: bool):
     data = _ensure_project(project_dict if isinstance(project_dict, dict) else {})
-    data = _set_open_flag(data, nid, which, bool(value))
-    left, sel, proj = _refresh_left(data, keep_id=nid)
-    seq_len_update = gr.update(value=_sequence_len_text(data, nid), visible=True)
+    if not _check_ownership(data, loaded_nid, loaded_proj):
+        left, sel, proj = _refresh_left(data, keep_id=loaded_nid)
+        return data, left, sel, proj, gr.update()
+    data = _set_open_flag(data, loaded_nid, which, bool(value))
+    left, sel, proj = _refresh_left(data, keep_id=loaded_nid)
+    seq_len_update = gr.update(value=_sequence_len_text(data, loaded_nid), visible=True)
     return data, left, sel, proj, seq_len_update
 
 
@@ -1333,25 +1466,27 @@ def _eh_open_flag(project_dict: dict, nid: str, which: str, value: bool):
 #     return data, left, sel, proj, seq_len_update
 
 
-def _eh_flip_orientation(project_dict: dict, nid: str):
+def _eh_flip_orientation(project_dict: dict, loaded_nid: str, loaded_proj: str):
     """
     Flip sequence orientation.
-    Atomically swaps open_start <-> open_end and lets _refresh_video_chain
-    reassign endpoints. Videos stay in position, preserving prompts and media.
-    Only works if exactly one end is open (not both, not neither).
+    ...
     """
     data = _ensure_project(project_dict if isinstance(project_dict, dict) else {})
     
+    if not _check_ownership(data, loaded_nid, loaded_proj):
+        left, sel, proj = _refresh_left(data, keep_id=loaded_nid)
+        return data, left, sel, proj, gr.update()
+    
     # nid could be seq_id directly, or a child node - find the sequence
-    seq_id = nid
+    seq_id = loaded_nid
     if seq_id not in data.get("sequences", {}):
-        seq_id, _, _ = parse_nid(nid)
+        seq_id, _, _ = parse_nid(loaded_nid)
     
     seq = data.get("sequences", {}).get(seq_id)
     
     if not seq:
-        left, sel, proj = _refresh_left(data, keep_id=nid)
-        seq_len_update = gr.update(value=_sequence_len_text(data, nid), visible=True)
+        left, sel, proj = _refresh_left(data, keep_id=loaded_nid )
+        seq_len_update = gr.update(value=_sequence_len_text(data, loaded_nid ), visible=True)
         return data, left, sel, proj, seq_len_update
     
     video_plan = seq.setdefault("video_plan", {})
@@ -1361,8 +1496,8 @@ def _eh_flip_orientation(project_dict: dict, nid: str):
     # Must have exactly one open end
     if old_open_start == old_open_end:
         gr.Warning("Flip requires exactly one open end (not both or neither)")
-        left, sel, proj = _refresh_left(data, keep_id=nid)
-        seq_len_update = gr.update(value=_sequence_len_text(data, nid), visible=True)
+        left, sel, proj = _refresh_left(data, keep_id=loaded_nid )
+        seq_len_update = gr.update(value=_sequence_len_text(data, loaded_nid ), visible=True)
         return data, left, sel, proj, seq_len_update
     
     # Atomically swap flags
@@ -1373,8 +1508,8 @@ def _eh_flip_orientation(project_dict: dict, nid: str):
     d = float(data["project"]["inbetween_generation"].get("duration_default_sec", 3.0))
     _refresh_video_chain(seq, d, data)
     
-    left, sel, proj = _refresh_left(data, keep_id=nid)
-    seq_len_update = gr.update(value=_sequence_len_text(data, nid), visible=True)
+    left, sel, proj = _refresh_left(data, keep_id=loaded_nid )
+    seq_len_update = gr.update(value=_sequence_len_text(data, loaded_nid ), visible=True)
     return data, left, sel, proj, seq_len_update
 
 def _eh_add_kf(project_dict: dict, nid: str):
@@ -1435,7 +1570,7 @@ def _eh_delete_kf(project_dict: dict, nid: str):
     return data, left, sel, proj
 
 
-def _eh_kf_fields(project_dict: dict, nid: str, pose_ui: str,
+def _eh_kf_fields(project_dict: dict, loaded_nid: str, loaded_proj: str, pose_ui: str,
                 cn_pose_enable: bool, cn_pose_animal: bool, kf_flip_horiz: bool, kf_flip_vert: bool, cn_pose_strength: float, cn_pose_start: float, cn_pose_end: float,
                 cn_shape_enable: bool, cn_shape_strength: float, cn_shape_start: float, cn_shape_end: float,
                 cn_outline_enable: bool, cn_outline_strength: float, cn_outline_start: float, cn_outline_end: float,
@@ -1445,9 +1580,10 @@ def _eh_kf_fields(project_dict: dict, nid: str, pose_ui: str,
                 charL: str, charR: str): 
 
     data = _ensure_project(project_dict) if isinstance(project_dict, dict) else _ensure_project({})
-    data = copy.deepcopy(data) # Fix: Ensure fresh object reference
+    data = copy.deepcopy(data)
     
-    kf, kind, _, _ = _resolve_node_context(data, nid)
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data
+    kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind != "kf": return data
 
     # Pose Path Logic
@@ -1487,11 +1623,12 @@ def _eh_kf_fields(project_dict: dict, nid: str, pose_ui: str,
     return data
 
 
-def _eh_vid_fields(project_dict: dict, nid: str, length: str, prompt: str, neg: str, is_reset: bool = False):
+def _eh_vid_fields(project_dict: dict, loaded_nid: str, loaded_proj: str, length: str, prompt: str, neg: str, is_reset: bool = False):
     data = _ensure_project(project_dict) if isinstance(project_dict, dict) else _ensure_project({})
     data = copy.deepcopy(data)
     
-    v, kind, _, _ = _resolve_node_context(data, nid)
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data
+    v, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind != "vid": return data
 
     if is_reset:
@@ -1509,17 +1646,18 @@ def _eh_vid_fields(project_dict: dict, nid: str, length: str, prompt: str, neg: 
     v["negative_prompt"] = neg or ""
     return data
 
-def _eh_reset_vid_length(project_dict, nid, prompt, neg):
+def _eh_reset_vid_length(project_dict, loaded_nid, loaded_proj, prompt, neg):
     # 1. Update the JSON state (removes the key)
-    new_data = _eh_vid_fields(project_dict, nid, None, prompt, neg, is_reset=True)
+    new_data = _eh_vid_fields(project_dict, loaded_nid, loaded_proj, None, prompt, neg, is_reset=True)
     # 2. Return the state and the ID to trigger the refresh
-    return new_data, nid
+    return new_data, loaded_nid
 
-def _eh_seq_text_fields(project_dict: dict, nid: str, setting_val: str, style_val: str, action_val: str):
+def _eh_seq_text_fields(project_dict: dict, loaded_nid: str, loaded_proj: str, setting_val: str, style_val: str, action_val: str):
     data = _ensure_project(project_dict) if isinstance(project_dict, dict) else _ensure_project({})
-    data = copy.deepcopy(data) # Fix
+    data = copy.deepcopy(data)
     
-    seq, kind, _, _ = _resolve_node_context(data, nid)
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data
+    seq, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind != "seq": return data
     
     seq["setting_prompt"] = setting_val or ""
@@ -1527,11 +1665,12 @@ def _eh_seq_text_fields(project_dict: dict, nid: str, setting_val: str, style_va
     seq["action_prompt"] = action_val or ""
     return data
 
-def _update_seq_field(project_dict: dict, nid: str, key: str, value: Any):
+def _update_seq_field(project_dict: dict, loaded_nid: str, loaded_proj: str, key: str, value: Any):
     data = _ensure_project(project_dict) if isinstance(project_dict, dict) else _ensure_project({})
-    data = copy.deepcopy(data) # Fix
+    data = copy.deepcopy(data)
     
-    seq, kind, _, _ = _resolve_node_context(data, nid)
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data
+    seq, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind == "seq":
         seq[key] = value
     return data
@@ -1555,9 +1694,11 @@ def _eh_inject_lora(pre_txt: str, nid: str, lora_path: str, current_prompt: str)
 
 
 
-def _eh_vid_lora_changed(pre_txt: str, nid: str, lora_path: str, current_prompt: str):
+def _eh_vid_lora_changed(pre_txt: str, loaded_nid: str, loaded_proj: str, lora_path: str, current_prompt: str):
     data = pre_txt if isinstance(pre_txt, dict) else {}
     if not lora_path: return pre_txt, gr.update(), gr.update()
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data, gr.update(), gr.update()
     new_prompt = current_prompt
     try:
         filename = os.path.basename(lora_path)
@@ -1565,7 +1706,7 @@ def _eh_vid_lora_changed(pre_txt: str, nid: str, lora_path: str, current_prompt:
         new_prompt = lora_tag + current_prompt
     except Exception: return pre_txt, gr.update(), gr.update()
 
-    v, kind, _, _ = _resolve_node_context(data, nid)
+    v, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind == "vid":
         if v.get("inbetween_prompt") != new_prompt:
             v["inbetween_prompt"] = new_prompt
@@ -1657,16 +1798,27 @@ def _eh_handle_pose_change(pose_path: str, current_workflow_path: str, project_d
     except Exception:
         stored_pose = ""
 
-    def _norm(s: str) -> str:
+    # def _norm(s: str) -> str:
+    #     try:
+    #         return os.path.abspath(os.path.normpath(s))
+    #     except Exception:
+    #         return s or ""
+
+    # is_real_pose_change = False
+    # if p or stored_pose:
+    #     # If pose differs from what's stored on the keyframe, it's a real user-driven change.
+    #     is_real_pose_change = (_norm(p) != _norm(stored_pose))
+    def _basename(s: str) -> str:
         try:
-            return os.path.abspath(os.path.normpath(s))
+            return os.path.basename(s).lower() if s else ""
         except Exception:
-            return s or ""
+            return ""
 
     is_real_pose_change = False
     if p or stored_pose:
-        # If pose differs from what's stored on the keyframe, it's a real user-driven change.
-        is_real_pose_change = (_norm(p) != _norm(stored_pose))
+        # Compare by filename only - same file can appear via temp path or stored path
+        is_real_pose_change = (_basename(p) != _basename(stored_pose))
+    print(f"[DEBUG POSE] p={p}, stored_pose={stored_pose}, nid={nid}, is_real_change={is_real_pose_change}")
 
     # Apply workflow auto-selection ONLY on real pose change.
     new_workflow_path_val = gr.update()
@@ -1750,16 +1902,18 @@ def _frames_dir_from_selected_video_path(sel_path: str) -> Path | None:
 
 # ---- DELETION HELPERS ----
 
-def _eh_delete_image(pre_txt: str, target_nid: str, selected_path: str):
+def _eh_delete_image(pre_txt: str, loaded_nid: str, loaded_proj: str, selected_path: str):
     time.sleep(0.5)
     data = pre_txt if isinstance(pre_txt, dict) else {}
-    kf, kind, _, _ = _resolve_node_context(data, target_nid)
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj): return pre_txt, gr.update(), (selected_path or ""), gr.update()
+    kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
     
     if kind != "kf" or not selected_path:
         return pre_txt, gr.update(), (selected_path or ""), gr.update()
     
     # 1. Neighbor Logic
-    image_files_before = _get_kf_gallery_images(data, target_nid)
+    image_files_before = _get_kf_gallery_images(data, loaded_nid)
     index_before = -1
     try:
         norm_target = str(Path(selected_path).resolve()).lower()
@@ -1778,7 +1932,7 @@ def _eh_delete_image(pre_txt: str, target_nid: str, selected_path: str):
     if kf.get("selected_image_path") == selected_path:
         kf["selected_image_path"] = None
         
-    image_files_after = _get_kf_gallery_images(data, target_nid)
+    image_files_after = _get_kf_gallery_images(data, loaded_nid)
     new_selection = None
     if image_files_after:
         if index_before != -1:
@@ -1788,12 +1942,17 @@ def _eh_delete_image(pre_txt: str, target_nid: str, selected_path: str):
         
     if kf: kf["selected_image_path"] = new_selection
     
-    dd_update, img_update = _dropdown_update_for_kf(data, target_nid, new_selection)
+    dd_update, img_update = _dropdown_update_for_kf(data, loaded_nid, new_selection)
     return data, dd_update, str(new_selection or ""), img_update
 
-def _eh_delete_video(project_dict: dict, nid: str, path_to_delete: str):
+def _eh_delete_video(project_dict: dict, loaded_nid: str, loaded_proj: str, path_to_delete: str):
     data = project_dict if isinstance(project_dict, dict) else {}
-    v, kind, _, _ = _resolve_node_context(data, nid)
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj):
+        yield (data, gr.update(), gr.update())
+        return
+    
+    v, kind, _, _ = _resolve_node_context(data, loaded_nid)
     
     yield (data, gr.update(), gr.update(value=None))
     time.sleep(0.3)
@@ -1802,7 +1961,7 @@ def _eh_delete_video(project_dict: dict, nid: str, path_to_delete: str):
         yield (data, gr.update(), gr.update())
         return
 
-    vid_files_before = _get_vid_gallery_files(data, nid)
+    vid_files_before = _get_vid_gallery_files(data, loaded_nid )
     index_before = -1
     try: index_before = vid_files_before.index(path_to_delete)
     except: pass
@@ -1818,7 +1977,7 @@ def _eh_delete_video(project_dict: dict, nid: str, path_to_delete: str):
     if v.get("selected_video_path") == path_to_delete:
         v["selected_video_path"] = None
         
-    vid_files_after = _get_vid_gallery_files(data, nid)
+    vid_files_after = _get_vid_gallery_files(data, loaded_nid)
     new_selection = None
     if vid_files_after:
         if index_before != -1:
@@ -2069,11 +2228,12 @@ def _eh_generate_pose_for_keyframe(project_dict: dict, nid: str, kf_prompt: str,
     )
 
 
-def _eh_upload_image(pre_txt: str, nid: str, file):
+def _eh_upload_image(pre_txt: str, loaded_nid: str, loaded_proj: str, file):
     data = pre_txt if isinstance(pre_txt, dict) else {}
-    data = copy.deepcopy(data) # Fix: Ensure fresh object reference
+    data = copy.deepcopy(data)
     
-    node, kind, _, seq_id = _resolve_node_context(data, nid)
+    if not _check_ownership(data, loaded_nid, loaded_proj): return pre_txt, gr.update(value=None)
+    node, kind, _, seq_id = _resolve_node_context(data, loaded_nid)
     if kind != "kf" or not file: return pre_txt, gr.update(value=None)
     
     kf_dir = _get_kf_dir(data, seq_id, node["id"])
@@ -2087,39 +2247,51 @@ def _eh_upload_image(pre_txt: str, nid: str, file):
         sel_resolved = str(Path(dest_p).resolve())
         node["selected_image_path"] = sel_resolved
         new_pre = data
-        dd_update, _ = _dropdown_update_for_kf(data, nid, sel_resolved)
+        dd_update, _ = _dropdown_update_for_kf(data, loaded_nid, sel_resolved)
         return new_pre, dd_update
     except Exception as e:
         print(f"Error uploading: {e}")
         return pre_txt, gr.update()
 
 
-def _eh_set_selected_image(pre_txt: str, target_nid: str, selected_path: str):
+def _eh_set_selected_image(pre_txt: str, loaded_nid: str, loaded_proj: str, selected_path: str):
     data = pre_txt if isinstance(pre_txt, dict) else {}
-    data = copy.deepcopy(data) # Force new reference for Gradio detection
+    data = copy.deepcopy(data)
     
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data, "", gr.update()
     sel = str(Path(selected_path).resolve()) if selected_path else None
-    kf, kind, _, _ = _resolve_node_context(data, target_nid)
+    kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
     
     if kind == "kf" and kf:
         if kf.get("selected_image_path") != sel:
             kf["selected_image_path"] = sel
             
-    dd_update, img_update = _dropdown_update_for_kf(data, target_nid, sel)
-    # Returns: JSON, SelectionState, Image
-    return data, (sel or ""), img_update
+    dd_update, img_update = _dropdown_update_for_kf(data, loaded_nid, sel)
+    return data, (sel or ""), img_update, gr.update(value="")
 
-def _eh_set_selected_video(project_dict: dict, nid: str, selected_path: str):
-    data = project_dict if isinstance(project_dict, dict) else {}
-    data = copy.deepcopy(data) # Force new reference
+# def _eh_set_selected_video(project_dict: dict, loaded_nid: str, loaded_proj: str, selected_path: str):
+#     data = project_dict if isinstance(project_dict, dict) else {}
+#     data = copy.deepcopy(data)
     
-    v, kind, _, _ = _resolve_node_context(data, nid)
-    if kind != "vid" or not selected_path: return data, gr.update()
+#     # if not _check_ownership(data, loaded_nid, loaded_proj): return data, gr.update()
+#     if not _check_ownership(data, loaded_nid, loaded_proj): return data, "", gr.update(), gr.update(value="")
+#     v, kind, _, _ = _resolve_node_context(data, loaded_nid)
+#     if kind != "vid" or not selected_path: return data, gr.update()
+    
+#     if v.get("selected_video_path") != selected_path:
+#         v["selected_video_path"] = selected_path
+#     return data, gr.update(value=selected_path)
+def _eh_set_selected_video(project_dict: dict, loaded_nid: str, loaded_proj: str, selected_path: str):
+    data = project_dict if isinstance(project_dict, dict) else {}
+    data = copy.deepcopy(data)
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj): return data, gr.update(), gr.update(value="")
+    v, kind, _, _ = _resolve_node_context(data, loaded_nid)
+    if kind != "vid" or not selected_path: return data, gr.update(), gr.update(value="")
     
     if v.get("selected_video_path") != selected_path:
         v["selected_video_path"] = selected_path
-    return data, gr.update(value=selected_path)
-
+    return data, gr.update(value=selected_path), gr.update(value="")
 
 def _eh_next_kf_image(project_dict: dict, nid: str, current_path: str):
     data = project_dict
@@ -2245,14 +2417,19 @@ def _eh_purge_bridge_pre_gen(project_dict: dict, nid: str):
             print(msg)
     return data, msg
 
-def _eh_delete_all_but_this_image(pre_txt: str, target_nid: str, selected_path: str):
+def _eh_delete_all_but_this_image(pre_txt: str, loaded_nid: str, loaded_proj: str, selected_path: str):
     data = pre_txt if isinstance(pre_txt, dict) else {}
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj):
+        yield (_dumps(data), gr.update(), selected_path)
+        return
+    
     yield (_dumps(data), gr.update(value=None), "")
     time.sleep(0.3)
     
-    node, kind, _, seq_id = _resolve_node_context(data, target_nid)
+    node, kind, _, seq_id = _resolve_node_context(data, loaded_nid)
     if kind != "kf" or not selected_path:
-        kf_files = _get_kf_gallery_images(data, target_nid)
+        kf_files = _get_kf_gallery_images(data, loaded_nid)
         choices = [(Path(p).name, p) for p in kf_files]
         yield (_dumps(data), gr.update(choices=choices, value=selected_path), selected_path)
         return
@@ -2266,23 +2443,28 @@ def _eh_delete_all_but_this_image(pre_txt: str, target_nid: str, selected_path: 
                     if str(f.resolve()) != keep: _try_delete_path(f)
         except Exception as e: print(f"Error deleting others: {e}")
         
-    image_files_after = _get_kf_gallery_images(data, target_nid)
+    image_files_after = _get_kf_gallery_images(data, loaded_nid)
     new_selection = selected_path if selected_path in image_files_after else (image_files_after[0] if image_files_after else None)
     
     if node: node["selected_image_path"] = new_selection
     
-    dd_update, img_update = _dropdown_update_for_kf(data, target_nid, new_selection)
+    dd_update, img_update = _dropdown_update_for_kf(data, loaded_nid, new_selection)
     sel_out = img_update.get("value") if isinstance(img_update, dict) else None
     yield (_dumps(data), dd_update, sel_out or "")
 
-def _eh_delete_all_but_this_video(project_dict: dict, nid: str, selected_path: str):
+def _eh_delete_all_but_this_video(project_dict: dict, loaded_nid: str, loaded_proj: str, selected_path: str):
     data = project_dict if isinstance(project_dict, dict) else {}
+    
+    if not _check_ownership(data, loaded_nid, loaded_proj):
+        yield (data, gr.update(), gr.update())
+        return
+    
     yield (data, gr.update(value=None), gr.update(value=None))
     time.sleep(0.3)
     
-    node, kind, _, seq_id = _resolve_node_context(data, nid)
+    node, kind, _, seq_id = _resolve_node_context(data, loaded_nid)
     if kind != "vid" or not selected_path:
-        files = _get_vid_gallery_files(data, nid)
+        files = _get_vid_gallery_files(data, loaded_nid)
         choices = [(Path(p).name, p) for p in files]
         yield (data, gr.update(choices=choices, value=selected_path), gr.update(value=selected_path))
         return
@@ -2300,7 +2482,7 @@ def _eh_delete_all_but_this_video(project_dict: dict, nid: str, selected_path: s
                         _try_delete_path(f)
         except Exception as e: print(f"Error deleting others: {e}")
         
-    files_after = _get_vid_gallery_files(data, nid)
+    files_after = _get_vid_gallery_files(data, loaded_nid)
     new_sel = selected_path if selected_path in files_after else (files_after[0] if files_after else None)
     
     if node: node["selected_video_path"] = new_sel
@@ -2366,7 +2548,8 @@ def _eh_node_selected(project_dict: dict, raw_value, cur_sel: str):
     seq_kf_iter_value = gr.update(value=_int(pj_kf.get("image_iterations_default"), 1))
     seq_ib_iter_value = gr.update(value=_int(pj_vid.get("video_iterations_default"), 1))
 
-    base_return_prefix = (node_selector_update, nid)
+    proj_name = data.get("project", {}).get("name", "")
+    base_return_prefix = (node_selector_update, nid, nid, proj_name)  # node_selector, selected_node, loaded_node_id, loaded_project_name
     base_return_suffix = (
         gr.update(value=_sequence_len_text(data, seq_id) if seq_id else "", visible=bool(seq_id)), # seq_len
         gr.update(value=None), # main_preview
@@ -2877,7 +3060,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                             seq_setting_md = gr.Textbox(label="Location modifier prompt", info="Additional modifiers apply only to this sequence, ie. Day/Night", lines=1, interactive=True, scale=3)
                             seq_lora = gr.Dropdown(label="Inject LoRA", info="Injects into Style prompt, but can be copied into any prompt", choices=[], interactive=True, scale=1)
                             seq_style_dd = gr.Dropdown(label="Style",  info="Define these in the Assets tab", choices=[("", "")], value="", interactive=True, allow_custom_value=False, filterable=False)
-                            seq_style_prompt_md = gr.Textbox(label="Style Prompt", info="Additional modifiers apply only to this sequence, ie. Fase/Slow",  lines=1, interactive=True)
+                            seq_style_prompt_md = gr.Textbox(label="Style Prompt", info="Additional modifiers apply only to this sequence, ie. Camera style",  lines=1, interactive=True)
                             seq_action_prompt_md = gr.Textbox(label="Sequence In-between Positive Prompt", info="Applies individually to every in-between, use for consistency not narrative", lines=1, interactive=True)
                             # seq_len = gr.Markdown("Sequence length: 0 sec", visible=True)
                         
@@ -2967,7 +3150,10 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                                             file_count="single",
                                             variant="secondary"
                                         )
+                                kf_flip_horiz = gr.Checkbox(label="Flip Horizontal", value=False)
+
                                 with gr.Row():
+
                                     with gr.Accordion("Pose Library and Options", open=False, elem_classes=["themed-accordion", "kf-theme"]):
 
                                         with gr.Column(variant="panel"):
@@ -2976,8 +3162,9 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                                             with gr.Row():
                                                 # kf_pose_gallery = gr.Gallery(label="Pose Library", height=200, columns=4, interactive=True, show_label=True, object_fit="contain", elem_id="kf_pose_gallery")
                                                 kf_pose_gallery = gr.Gallery(label="Pose Library", height=200, interactive=True, show_label=True, object_fit="contain", elem_id="kf_pose_gallery", allow_preview=False)
+                                                
                                             with gr.Row():
-                                                kf_flip_horiz = gr.Checkbox(label="Flip Horizontal", value=False)
+                                                # kf_flip_horiz = gr.Checkbox(label="Flip Horizontal", value=False)
                                                 kf_flip_vert = gr.Checkbox(label="Flip Vertical", value=False)
                                         # Pose Group
                                         with gr.Column(variant="panel"):
@@ -3063,15 +3250,27 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
 
                                 main_preview_image = gr.Image(show_label=False, type="filepath", interactive=False)
 
+                            # with gr.Accordion("Manage Files", open=False, elem_classes=["themed-accordion", "stop-theme"]):
+                            #     kf_upload_btn = gr.UploadButton("Upload Image", file_count="single", file_types=["image"])
+                            #     with gr.Row():
+                            #         kf_delete_img_btn = gr.Button("Delete Selected ", variant="stop")
+                            #         kf_del_others_btn = gr.Button("Delete All Others", variant="stop", visible=features.get("show_delete_others", False))
+
+                            # # with gr.Group() as kf_tools:
+                            #     test_gen_image = gr.Image(label="Keyframe", interactive=False, height=240, visible=False) 
+                            #     # kf_refresh_status_btn = gr.Button("Refresh Status", variant="secondary", size="sm") 
                             with gr.Accordion("Manage Files", open=False, elem_classes=["themed-accordion", "stop-theme"]):
                                 kf_upload_btn = gr.UploadButton("Upload Image", file_count="single", file_types=["image"])
                                 with gr.Row():
                                     kf_delete_img_btn = gr.Button("Delete Selected ", variant="stop")
                                     kf_del_others_btn = gr.Button("Delete All Others", variant="stop", visible=features.get("show_delete_others", False))
 
+                            with gr.Accordion("Execution Info", open=False, elem_classes=["themed-accordion", "kf-theme"],visible=features.get("show_generation_info", False)):
+                                kf_exec_load_btn = gr.Button("Load from Selected", variant="secondary")
+                                kf_exec_info = gr.Markdown("")
+
                             # with gr.Group() as kf_tools:
-                                test_gen_image = gr.Image(label="Keyframe", interactive=False, height=240, visible=False) 
-                                # kf_refresh_status_btn = gr.Button("Refresh Status", variant="secondary", size="sm") 
+                                test_gen_image = gr.Image(label="Keyframe", interactive=False, height=240, visible=False)
 
 
             # --- GROUP 3: IN-BETWEEN MODE ---
@@ -3101,30 +3300,40 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                             with gr.Group():
                                 vid_generate_count = gr.Number(label="Iterations to Generate", info="This many will be generated as long as browser is open", value=1, precision=0, minimum=1, interactive=True)
                                 test_vid_btn = gr.Button("Generate In-between Video", variant="primary")
-                            with gr.Group():
+                            with gr.Group():                                
                                 with gr.Row():
-                                    vid_gallery_dd = gr.Dropdown(label="Select Video Result", interactive=True, filterable=False, allow_custom_value=False)
+                                    vid_gallery_dd = gr.Dropdown(show_label=False, label="Selected Video", interactive=True, filterable=False, allow_custom_value=False)
                                 with gr.Row():
                                     vid_prev_clip_btn = gr.Button("Select Previous", variant="secondary")
                                     vid_next_clip_btn = gr.Button("Select Next", variant="secondary")
-                                vid_player = gr.Video(show_label=False, interactive=False, autoplay=True, loop=True, show_share_button=False)
+                                # proj_w = data0.get("project", {}).get("width", 1280)
+                                # proj_h = data0.get("project", {}).get("height", 720)
+                                # vid_player = gr.Video(show_label=False, interactive=False, autoplay=True, loop=True, show_share_button=False, width=proj_w, height=proj_h)
+                                vid_player = gr.Video(show_label=False, interactive=False, autoplay=True, loop=True, show_share_button=False, elem_classes=["constrained-video"])
+                                # vid_player = gr.Video(show_label=False, interactive=False, autoplay=True, loop=True, show_share_button=False)
+
 
                             with gr.Accordion("Manage Files", open=False, elem_classes=["themed-accordion", "stop-theme"]):
                                 with gr.Row():
                                     vid_delete_btn = gr.Button("Delete Selected", variant="stop")
                                     vid_del_others_btn = gr.Button("Delete All Others", variant="stop", visible=features.get("show_delete_others", False))
-                                test_vid_player = gr.Video(label="In-between", interactive=False, autoplay=True, loop=True, show_share_button=False, visible=False) 
+                                test_vid_player = gr.Video(label="In-between", interactive=False, autoplay=True, loop=True, show_share_button=False, visible=False)
+                            with gr.Accordion("Execution Info", open=False, elem_classes=["themed-accordion", "vid-theme"], visible=features.get("show_generation_info", False)):
+                                vid_exec_load_btn = gr.Button("Load from Selected", variant="secondary")
+                                vid_exec_info = gr.Markdown("")
 
             # EVENT BINDING (Retaining Original Logic using new Handlers)
             
             selected_node = gr.State(value=initial_sel)
+            loaded_node_id = gr.State(value=initial_sel)  # Tracks which node the form was loaded FOR
+            loaded_project_name = gr.State(value=data0.get("project", {}).get("name", ""))  # Tracks which project
             outline_sig = gr.State(value=_outline_signature(data0))
             kf_gallery_selection = gr.State(value=None) 
             dummy_rerun_trigger = gr.State(value="")
 
             # Helper for constructing node_selector output list (order matters!)
             node_selector_outputs = [
-                node_selector, selected_node, seq_group, kf_group, vid_group,
+                node_selector, selected_node, loaded_node_id, loaded_project_name, seq_group, kf_group, vid_group,
                 seq_setting_dd, seq_setting_md, seq_style_dd, seq_style_prompt_md, seq_lora, seq_action_prompt_md, seq_open_start, seq_open_end,
                 gr.State(), # placeholder for clear_assets_btn
                 kf_pose, kf_pose_preview,
@@ -3145,7 +3354,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                 _eh_node_selected,
                 inputs=[preview, node_selector, selected_node],
                 outputs=node_selector_outputs,
-                show_progress="hidden", queue=False
+                show_progress="hidden", queue=True
             )
             
             # Rehydrate / Refresh logic
@@ -3153,22 +3362,22 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             preview.change(_rehydrate_if_changed, inputs=[preview, selected_node, outline_sig], outputs=[node_selector, selected_node, proj_len, outline_sig], show_progress="hidden", queue=False)
             
             # Sequence Field Bindings
-            seq_text_fields_inputs = [preview, selected_node, seq_setting_md, seq_style_prompt_md, seq_action_prompt_md]
+            # seq_text_fields_inputs = [preview, loaded_node_id, seq_setting_md, seq_style_prompt_md, seq_action_prompt_md]
+            seq_text_fields_inputs = [preview, loaded_node_id, loaded_project_name, seq_setting_md, seq_style_prompt_md, seq_action_prompt_md]
             for comp in [seq_setting_md, seq_style_prompt_md, seq_action_prompt_md]:
-                comp.change(_eh_seq_text_fields, seq_text_fields_inputs, [preview], show_progress="hidden", queue=False)
+                comp.change(_eh_seq_text_fields, seq_text_fields_inputs, [preview], show_progress="hidden", queue=True)
 
-            seq_setting_dd.change(fn=lambda t, n, v: _update_seq_field(t, n, "setting_id", v), inputs=[preview, selected_node, seq_setting_dd], outputs=[preview], queue=False)
-            # LoRA Injectors
+            seq_setting_dd.change(fn=lambda t, n, p, v: _update_seq_field(t, n, p, "setting_id", v), inputs=[preview, loaded_node_id, loaded_project_name, seq_setting_dd], outputs=[preview], queue=True)            # LoRA Injectors
             seq_lora.change(_eh_inject_lora, inputs=[preview, selected_node, seq_lora, seq_style_prompt_md], outputs=[preview, seq_style_prompt_md, seq_lora], show_progress="hidden", queue=False)
             kf_lora.change(_eh_inject_lora, inputs=[preview, selected_node, kf_lora, kf_prompt], outputs=[preview, kf_prompt, kf_lora], show_progress="hidden", queue=False)
             vid_lora.change(_eh_inject_lora, inputs=[preview, selected_node, vid_lora, vid_prompt], outputs=[preview, vid_prompt, vid_lora], show_progress="hidden", queue=False)
             
-            seq_style_dd.change(fn=lambda t, n, v: _update_seq_field(t, n, "style_id", v), inputs=[preview, selected_node, seq_style_dd], outputs=[preview], queue=False)
-            
+            # seq_style_dd.change(fn=lambda t, n, v: _update_seq_field(t, n, "style_id", v), inputs=[preview, selected_node, seq_style_dd], outputs=[preview], queue=False)
+            seq_style_dd.change(fn=lambda t, n, p, v: _update_seq_field(t, n, p, "style_id", v), inputs=[preview, loaded_node_id, loaded_project_name, seq_style_dd], outputs=[preview], queue=True)
 
 
-            seq_open_start.change(lambda pre, nid, v: _eh_open_flag(pre, nid, "open_start", v), [preview, selected_node, seq_open_start], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
-            
+            # seq_open_start.change(lambda pre, nid, v: _eh_open_flag(pre, nid, "open_start", v), [preview, selected_node, seq_open_start], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
+            seq_open_start.change(lambda pre, nid, proj, v: _eh_open_flag(pre, nid, proj, "open_start", v), [preview, loaded_node_id, loaded_project_name, seq_open_start], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=True)
             # Sequence Assets display - refresh when node selection changes
             def _update_seq_assets(pre, raw_value):
                 data = pre if isinstance(pre, dict) else {}
@@ -3189,11 +3398,13 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             )
 
 
-            seq_open_end.change(lambda pre, nid, v: _eh_open_flag(pre, nid, "open_end", v), [preview, selected_node, seq_open_end], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
-            seq_flip_btn.click(_eh_flip_orientation, [preview, selected_node], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
+            # seq_open_end.change(lambda pre, nid, v: _eh_open_flag(pre, nid, "open_end", v), [preview, selected_node, seq_open_end], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
+            seq_open_end.change(lambda pre, nid, proj, v: _eh_open_flag(pre, nid, proj, "open_end", v), [preview, loaded_node_id, loaded_project_name, seq_open_end], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=True)
+            # seq_flip_btn.click(_eh_flip_orientation, [preview, selected_node], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
+            seq_flip_btn.click(_eh_flip_orientation, [preview, loaded_node_id, loaded_project_name], [preview, node_selector, selected_node, proj_len, seq_len], show_progress="hidden", queue=False)
             # Keyframe Field Bindings
             kf_all_fields_inputs = [ 
-                preview, selected_node, kf_pose, 
+                preview, loaded_node_id, loaded_project_name, kf_pose,
                 kf_cn_pose_enable, kf_cn_pose_animal, kf_flip_horiz, kf_flip_vert, kf_cn_pose_strength, kf_cn_pose_start, kf_cn_pose_end,
                 kf_cn_shape_enable, kf_cn_shape_strength, kf_cn_shape_start, kf_cn_shape_end,
                 kf_cn_outline_enable, kf_cn_outline_strength, kf_cn_outline_start, kf_cn_outline_end,
@@ -3205,16 +3416,16 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             
             for comp in kf_all_fields_inputs[3:]: # Skip first 3
                 if isinstance(comp, gr.components.Textbox):
-                    comp.blur(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=False)
+                    comp.blur(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
                 else:
-                    comp.change(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=False)
+                    comp.change(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
 
             kf_pose.change(
                 _eh_handle_pose_change,
                 inputs=[kf_pose, kf_workflow_json, preview, selected_node],
                 outputs=[kf_pose_preview, kf_cn_pose_animal, kf_workflow_json, kf_cn_pose_thumb, kf_cn_shape_thumb, kf_cn_outline_thumb],
                 queue=False, show_progress="hidden"
-            ).then(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=False)
+            ).then(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
 
 
             kf_pose_gallery.select(fn=_eh_pose_gallery_select, inputs=[kf_pose_gallery], outputs=[kf_pose], show_progress="hidden")
@@ -3245,7 +3456,8 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             )
 
             # Video Field Bindings
-            vid_all_fields_inputs = [preview, selected_node, vid_length, vid_prompt, vid_neg]
+            # vid_all_fields_inputs = [preview, selected_node, vid_length, vid_prompt, vid_neg]
+            vid_all_fields_inputs = [preview, loaded_node_id, loaded_project_name, vid_length, vid_prompt, vid_neg]
             
             # Change on radio triggers save THEN UI refresh to update labels
             vid_length.change(
@@ -3261,12 +3473,12 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                 show_progress="hidden"
             )
 
-            vid_prompt.change(_eh_vid_fields, vid_all_fields_inputs, [preview], show_progress="hidden", queue=False)
+            vid_prompt.blur(_eh_vid_fields, vid_all_fields_inputs, [preview], show_progress="hidden", queue=True)
 
             # Reset button clears the value and refreshes labels
             clear_vid_len_btn.click(
                 fn=_eh_reset_vid_length,
-                inputs=[preview, selected_node, vid_prompt, vid_neg],
+                inputs=[preview, loaded_node_id, loaded_project_name, vid_prompt, vid_neg],
                 outputs=[preview, selected_node],
                 show_progress="hidden"
             ).then(
@@ -3275,7 +3487,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                 outputs=node_selector_outputs,
                 show_progress="hidden"
             )
-            vid_neg.blur(_eh_vid_fields, vid_all_fields_inputs, [preview], show_progress="hidden", queue=False)
+            vid_neg.blur(_eh_vid_fields, vid_all_fields_inputs, [preview], show_progress="hidden", queue=True)
 
             # Batch Iteration Edit Handlers
             seq_kf_inputs["seq_kf_iter"].change(
@@ -3361,25 +3573,34 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             )
 
             # Image Actions
-            kf_gallery.change(_eh_set_selected_image, inputs=[preview, selected_node, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
-            kf_upload_btn.upload(_eh_upload_image, inputs=[preview, selected_node, kf_upload_btn], outputs=[preview, kf_gallery])
-            kf_delete_img_btn.click(_eh_delete_image, inputs=[preview, selected_node, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection, main_preview_image], show_progress="hidden")
-            kf_del_others_btn.click(_eh_delete_all_but_this_image, inputs=[preview, selected_node, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection])
+            # kf_gallery.change(_eh_set_selected_image, inputs=[preview, selected_node, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
+            # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
+            # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
+            # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image, kf_exec_info], show_progress="hidden")
+            kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image, kf_exec_info], show_progress="hidden")
+            kf_upload_btn.upload(_eh_upload_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_upload_btn], outputs=[preview, kf_gallery])
+            # kf_delete_img_btn.click(_eh_delete_image, inputs=[preview, selected_node, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection, main_preview_image], show_progress="hidden")
+            kf_delete_img_btn.click(_eh_delete_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection, main_preview_image], show_progress="hidden")
+            kf_del_others_btn.click(_eh_delete_all_but_this_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection])
             
 
             kf_prev_img_btn.click(_eh_prev_kf_image, inputs=[preview, selected_node, kf_gallery], outputs=[kf_gallery])
             kf_next_img_btn.click(_eh_next_kf_image, inputs=[preview, selected_node, kf_gallery], outputs=[kf_gallery])
+            kf_exec_load_btn.click(_eh_load_execution_info_kf, inputs=[kf_gallery], outputs=[kf_exec_info])
 
 
-            vid_gallery_dd.change(_eh_set_selected_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_player], scroll_to_output=False, show_progress=False)
+            # vid_gallery_dd.change(_eh_set_selected_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_player], scroll_to_output=False, show_progress=False)
+            # vid_gallery_dd.change(_eh_set_selected_video, inputs=[preview, loaded_node_id, loaded_project_name, vid_gallery_dd], outputs=[preview, vid_player], scroll_to_output=False, show_progress=False)
+            vid_gallery_dd.change(_eh_set_selected_video, inputs=[preview, loaded_node_id, loaded_project_name, vid_gallery_dd], outputs=[preview, vid_player, vid_exec_info], scroll_to_output=False, show_progress=False)
 
-
-            vid_delete_btn.click(_eh_delete_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
-            vid_del_others_btn.click(_eh_delete_all_but_this_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
-            
+            # vid_delete_btn.click(_eh_delete_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
+            vid_delete_btn.click(_eh_delete_video, inputs=[preview, loaded_node_id, loaded_project_name, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
+            # vid_del_others_btn.click(_eh_delete_all_but_this_video, inputs=[preview, selected_node, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
+            vid_del_others_btn.click(_eh_delete_all_but_this_video, inputs=[preview, loaded_node_id, loaded_project_name, vid_gallery_dd], outputs=[preview, vid_gallery_dd, vid_player])
 
             vid_prev_clip_btn.click(_eh_prev_vid_clip, inputs=[preview, selected_node, vid_gallery_dd], outputs=[vid_gallery_dd], scroll_to_output=False, show_progress=False)
             vid_next_clip_btn.click(_eh_next_vid_clip, inputs=[preview, selected_node, vid_gallery_dd], outputs=[vid_gallery_dd], scroll_to_output=False, show_progress=False)
+            vid_exec_load_btn.click(_eh_load_execution_info_vid, inputs=[vid_gallery_dd], outputs=[vid_exec_info])
 
             # Purge Wiring
             seq_kf_purge["seq_kf_purge_btn"].click(lambda: gr.update(visible=True), outputs=[seq_kf_purge["seq_kf_confirm_group"]])

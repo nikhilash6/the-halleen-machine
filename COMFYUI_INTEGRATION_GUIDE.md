@@ -118,8 +118,7 @@ cp custom_nodes/ComfyUI-Manager/requirements.txt ./manager_requirements.txt
 find custom_nodes -name "requirements.txt" -exec ./venv/bin/pip install -r {} \;
 
 
-# Launch with --highvram for RTX 4090 performance and --enable-manager for the UI extension
-# The server will be accessible via RunPod's HTTP Port 8188
+
 
 # optional, make sure you're in the right place
 deactivate
@@ -127,8 +126,10 @@ cd /workspace/ComfyUI
 source venv/bin/activate
 
 # restart comfy with the custom nodes in place
-python3 main.py --listen 0.0.0.0 --port 8188 --highvram --enable-manager
+python3 main.py --listen 0.0.0.0 --port 8188 
 
+# The server will be accessible via RunPod's HTTP Port 8188
+# --highvram --enable-manager may be applicable depending on your environment.
 
 
 
@@ -137,9 +138,9 @@ python3 main.py --listen 0.0.0.0 --port 8188 --highvram --enable-manager
 cp samples/workflows_openincomfy/THM*.json /workspace/ComfyUI/user/default/workflows/
 
 # Now go to Comfy UI and open the workflows that start with "THM", they should be in your default folder.
-# One by one, open them and resolve any errors, missing nodes or models, vram configruation etc. Iterate until you can run the default prompts to get to a finished result.  Key values will be overridden by The Halleen Machine.  This is only to prove the nodes and models needed are in place.  
+# One by one, open them and resolve any errors, missing nodes or models, vram configruation etc. Iterate until you can run the default prompts to get to a completed generation.  No need to quality control here.  Key values will be overridden by The Halleen Machine.  This is only to prove the nodes and models needed are in place.  
 # Editing these workflows will not change the ones run by The Halleen Machine, this step is for validation only. 
-# there's also the basic "purple bottle" workflow that used to be the ComfyUI default, use it for verifying basic functionality
+# there's also the basic "purple bottle" workflow that used to be the ComfyUI default, use it for verifying basic functionality if needed
 
 
 # --- PHASE 4: RUN THE HALLEEN MACHINE ---

@@ -181,7 +181,6 @@ def inject_pose_loras(graph: dict, lora_list: list):
     
     print(f"[POSE LORAS] Injected {len(lora_list)} LoRAs into pose workflow")
 
-
 def expand_inline_wildcards(text, iter_index=0):
     if not text: return ""
     def repl(m):
@@ -189,6 +188,24 @@ def expand_inline_wildcards(text, iter_index=0):
         if not opts: return ""
         return random.choice(opts)
     return _WC_RE.sub(repl, text)
+
+def resolve_wildcards_in_dict(data):
+    """Pre-resolve all wildcards in a dict's string values"""
+    if not data: return {}
+    resolved = {}
+    for k, v in data.items():
+        if isinstance(v, str):
+            resolved[k] = expand_inline_wildcards(v)
+        else:
+            resolved[k] = v
+    return resolved
+# def expand_inline_wildcards(text, iter_index=0):
+#     if not text: return ""
+#     def repl(m):
+#         opts = [p.strip() for p in m.group(1).split("|")]
+#         if not opts: return ""
+#         return random.choice(opts)
+#     return _WC_RE.sub(repl, text)
 
 def compose_image_prompt(template_str, project_data, sequence_data, keyframe_data, char_data=None, iter_index=0):
     if char_data is None: char_data = {}
@@ -223,6 +240,25 @@ def compose_image_prompt_2char(template_str, project_data, sequence_data, keyfra
         elif source_name == 'char2': source_data = char2_data
         value = (source_data or {}).get(key, "")
         return expand_inline_wildcards(str(value), iter_index)
+    prompt = _TEMPLATE_RE.sub(resolve_placeholder, template_str)
+    return '\n'.join(line for line in prompt.splitlines() if line.strip()).strip()
+
+def compose_image_prompt_2char_noresolve(template_str, project_data, sequence_data, keyframe_data, char1_data=None, char2_data=None):
+    """Compose prompt WITHOUT expanding wildcards - expects pre-resolved data"""
+    if char1_data is None: char1_data = {}
+    if char2_data is None: char2_data = {}
+    def resolve_placeholder(match):
+        key_path = match.group(1)
+        parts = key_path.split('.')
+        if len(parts) != 2: return f"[INVALID_KEY: {key_path}]"
+        source_name, key = parts[0], parts[1]
+        source_data = None
+        if source_name == 'project': source_data = project_data
+        elif source_name == 'sequence': source_data = sequence_data
+        elif source_name == 'keyframe': source_data = keyframe_data
+        elif source_name == 'char1': source_data = char1_data
+        elif source_name == 'char2': source_data = char2_data
+        return str((source_data or {}).get(key, ""))
     prompt = _TEMPLATE_RE.sub(resolve_placeholder, template_str)
     return '\n'.join(line for line in prompt.splitlines() if line.strip()).strip()
 
@@ -709,10 +745,15 @@ def run(config_path, status_file_override=None):
     advance = int(imggen.get("advance_seed_by", 17))
     default_n = int(imggen.get("image_iterations_default", 1))
     sampler_cfg = imggen.get("cfg", 6.0)
-    sampler_steps = imggen.get("steps", 30)
+    sampler_steps_base = imggen.get("steps", 30)
     sampler_name = imggen.get("sampler_name", "euler")
     sampler_scheduler = imggen.get("scheduler", "karras")
     
+    # Express mode: half steps, minimum 12
+    # express_images = bool(imggen.get("express_images", False))
+    express_mode = bool(get(project, "inbetween_generation", "express_video", default=False))
+    sampler_steps = max(12, round(sampler_steps_base / 3)) if express_mode else sampler_steps_base
+
     prompt_template = imggen.get("prompt_template", DEFAULT_IMAGE_TEMPLATE)
     prompt_template_2char = imggen.get("prompt_template_2char", DEFAULT_IMAGE_TEMPLATE_2CHAR)
 
@@ -842,14 +883,41 @@ def run(config_path, status_file_override=None):
                     
                     if bg_mult < 1.0 or fg_mult < 1.0: print(f"[MIXER] {id_name}: BG x{bg_mult:.2f} | FG x{fg_mult:.2f}")
 
+                    # if num_chars >= 2:
+                    #     if left_char and right_char:
+                    #         for t, c in (("LeftLora", left_char), ("RightLora", right_char)):
+                    #             pass
+
+                    #         left_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, 0)
+                    #         right_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, 0)
+                    #         heal_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, 0)
+
+
                     if num_chars >= 2:
                         if left_char and right_char:
                             for t, c in (("LeftLora", left_char), ("RightLora", right_char)):
                                 pass
 
-                            left_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, 0)
-                            right_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, 0)
-                            heal_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, 0)
+                            # # Pre-resolve wildcards: template once, each char slot once
+                            # resolved_template = expand_inline_wildcards(prompt_template_2char)
+                            # resolved_left = resolve_wildcards_in_dict(left_char)
+                            # resolved_right = resolve_wildcards_in_dict(right_char)
+                            
+                            # left_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_left)
+                            # right_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_right, resolved_right)
+                            # heal_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_right)
+                            # Pre-resolve wildcards: template once, shared data once, each char slot once
+                            resolved_template = expand_inline_wildcards(prompt_template_2char)
+                            resolved_project = resolve_wildcards_in_dict(project)
+                            resolved_seq = resolve_wildcards_in_dict(seq)
+                            resolved_kf = resolve_wildcards_in_dict(id_conf)
+                            resolved_left = resolve_wildcards_in_dict(left_char)
+                            resolved_right = resolve_wildcards_in_dict(right_char)
+                            
+                            left_p_raw = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_left, resolved_left)
+                            right_p_raw = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_right, resolved_right)
+                            heal_p_raw = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_left, resolved_right)
+
                             all_loras.update(_LORA_RE.findall(left_p_raw)); all_loras.update(_LORA_RE.findall(right_p_raw))
                     elif num_chars == 1:
                         if character:
@@ -983,11 +1051,34 @@ def run(config_path, status_file_override=None):
 
                         # seed = base_seed + i * advance
                         # update_seeds(graph, seed, sampler_cfg, sampler_name, sampler_scheduler, sampler_steps)
+                        # if num_chars >= 2:
+                        #     if i > 0:
+                        #         lp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, i)
+                        #         rp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, i)
+                        #         hp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, i)
+                        #     else: lp, rp, hp = left_p_raw, right_p_raw, heal_p_raw
                         if num_chars >= 2:
+                            # if i > 0:
+                            #     # Fresh wildcard resolution for new iteration
+                            #     resolved_template = expand_inline_wildcards(prompt_template_2char)
+                            #     resolved_left = resolve_wildcards_in_dict(left_char)
+                            #     resolved_right = resolve_wildcards_in_dict(right_char)
+                                
+                            #     lp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_left)
+                            #     rp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_right, resolved_right)
+                            #     hp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_right)
                             if i > 0:
-                                lp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, i)
-                                rp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, i)
-                                hp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, i)
+                                # Fresh wildcard resolution for new iteration
+                                resolved_template = expand_inline_wildcards(prompt_template_2char)
+                                resolved_project = resolve_wildcards_in_dict(project)
+                                resolved_seq = resolve_wildcards_in_dict(seq)
+                                resolved_kf = resolve_wildcards_in_dict(id_conf)
+                                resolved_left = resolve_wildcards_in_dict(left_char)
+                                resolved_right = resolve_wildcards_in_dict(right_char)
+                                
+                                lp = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_left, resolved_left)
+                                rp = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_right, resolved_right)
+                                hp = compose_image_prompt_2char_noresolve(resolved_template, resolved_project, resolved_seq, resolved_kf, resolved_left, resolved_right)
                             else: lp, rp, hp = left_p_raw, right_p_raw, heal_p_raw
                             
                             final_lp = _LORA_RE.sub("", lp).strip()
@@ -1038,6 +1129,36 @@ def run(config_path, status_file_override=None):
                                 # snapshot = {
                                     # "item_data": id_conf,
                                     # "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
+                                # snapshot = {
+                                #     "item_data": id_conf,
+                                #     "sequence_context": {
+                                #         "setting_prompt": seq.get("setting_prompt"),
+                                #         "setting_asset": seq.get("setting_asset"),
+                                #         "style_prompt": seq.get("style_prompt"),
+                                #         "style_asset": seq.get("style_asset")
+                                #     },
+                                #     "project_context": {
+                                #         "style_prompt": project.get("style_prompt"),
+                                #         "model": project.get("model"),
+                                #         "width": w,
+                                #         "height": h,
+                                #         "negatives": {
+                                #             "global": project.get("negatives", {}).get("global"),
+                                #             "keyframes_all": project.get("negatives", {}).get("keyframes_all"),
+                                #             "inbetween_all": project.get("negatives", {}).get("inbetween_all"),
+                                #             "heal_all": project.get("negatives", {}).get("heal_all")
+                                #         },
+                                #         "lora_normalization": {
+                                #             "fg_enabled": project.get("lora_normalization", {}).get("fg_enabled"),
+                                #             "fg_max": project.get("lora_normalization", {}).get("fg_max"),
+                                #             "bg_enabled": project.get("lora_normalization", {}).get("bg_enabled"),
+                                #             "bg_max": project.get("lora_normalization", {}).get("bg_max")
+                                #         }
+                                #     },
+                                #     "generation": {"seed": seed, "steps": sampler_steps, "cfg": sampler_cfg, "sampler": sampler_name, "scheduler": sampler_scheduler},
+                                #     "meta": {"timestamp": datetime.now().isoformat()}
+                                # }
+                                executed_prompt = hp if num_chars >= 2 else sp
                                 snapshot = {
                                     "item_data": id_conf,
                                     "sequence_context": {
@@ -1051,6 +1172,10 @@ def run(config_path, status_file_override=None):
                                         "model": project.get("model"),
                                         "width": w,
                                         "height": h,
+                                        "steps": sampler_steps,
+                                        "cfg": sampler_cfg,
+                                        "sampler": sampler_name,
+                                        "scheduler": sampler_scheduler,
                                         "negatives": {
                                             "global": project.get("negatives", {}).get("global"),
                                             "keyframes_all": project.get("negatives", {}).get("keyframes_all"),
@@ -1064,7 +1189,7 @@ def run(config_path, status_file_override=None):
                                             "bg_max": project.get("lora_normalization", {}).get("bg_max")
                                         }
                                     },
-                                    "generation": {"seed": seed, "steps": sampler_steps, "cfg": sampler_cfg, "sampler": sampler_name, "scheduler": sampler_scheduler},
+                                    "generation": {"seed": seed, "executed_prompt": executed_prompt},
                                     "meta": {"timestamp": datetime.now().isoformat()}
                                 }
 

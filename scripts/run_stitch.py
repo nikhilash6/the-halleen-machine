@@ -70,7 +70,7 @@ def find_latest_bridge_dir(bridges_root: Path, a_name: str, b_name: str) -> Opti
     return candidates[0] if candidates else None
 
 def get_project_fps(config: Dict[str, Any], project_root: Path) -> float:
-    DEFAULT_FPS = 24.0
+    DEFAULT_FPS = 16
     try:
         vg = config.get("project", {}).get("inbetween_generation", {})
         wf_rel_path = vg.get("video_workflow_json")
@@ -287,151 +287,7 @@ def generate_animatic_segment(
     # Build filter chain
     filter_parts = [f"[0:v][1:v]xfade=transition=fade:duration={duration_sec}:offset=0[faded]"]
     
-    # Add text overlays if provided
-    # text_filters = []
-    # if top_text:
-    #     escaped_top = _escape_drawtext(top_text)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_top}':x=20:y=20:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    # if bottom_text:
-    #     escaped_bottom = _escape_drawtext(bottom_text)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_bottom}':x=20:y=h-{int(out_h * 0.15)}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    # Add text overlays if provided
-    # text_filters = []
-    
-    # if top_text:
-    #     top_line1, top_line2 = _wrap_text_two_lines(top_text, 75)
-    #     escaped_top1 = _escape_drawtext(top_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_top1}':x=20:y=20:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     if top_line2:
-    #         escaped_top2 = _escape_drawtext(top_line2)
-    #         line2_y = 20 + top_fontsize + 10
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_top2}':x=20:y={line2_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    
-    # if bottom_text:
-    #     bottom_line1, bottom_line2 = _wrap_text_two_lines(bottom_text, 75)
-    #     # Position from bottom, moved up to avoid player controls
-    #     bottom_y2 = int(out_h * 0.75)  # Second line position
-    #     bottom_y1 = bottom_y2 - bottom_fontsize - 10  # First line above second
-        
-    #     escaped_bottom1 = _escape_drawtext(bottom_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_bottom1}':x=20:y={bottom_y1}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     if bottom_line2:
-    #         escaped_bottom2 = _escape_drawtext(bottom_line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_bottom2}':x=20:y={bottom_y2}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    # Add text overlays if provided
-    # text_filters = []
-    # current_y = 20
-    # line_spacing = 10
-    
-    # # Timestamp line (own line at very top)
-    # if timestamp_text:
-    #     escaped_ts = _escape_drawtext(timestamp_text)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_ts}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += top_fontsize + line_spacing
-    
-    # # Setting text (up to two lines below timestamp)
-    # if top_text:
-    #     top_line1, top_line2 = _wrap_text_two_lines(top_text, 75)
-    #     escaped_top1 = _escape_drawtext(top_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_top1}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += top_fontsize + line_spacing
-    #     if top_line2:
-    #         escaped_top2 = _escape_drawtext(top_line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_top2}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    
-    # # Bottom text (lower third, up to two lines)
-    # if bottom_text:
-    #     bottom_line1, bottom_line2 = _wrap_text_two_lines(bottom_text, 75)
-    #     # Position from bottom, moved up to avoid player controls
-    #     bottom_y2 = int(out_h * 0.72)  # Second line position
-    #     bottom_y1 = bottom_y2 - bottom_fontsize - line_spacing  # First line above second
-        
-    #     escaped_bottom1 = _escape_drawtext(bottom_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_bottom1}':x=20:y={bottom_y1}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     if bottom_line2:
-    #         escaped_bottom2 = _escape_drawtext(bottom_line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_bottom2}':x=20:y={bottom_y2}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    # Add text overlays if provided
-    # All text at top: timestamp, setting, then prompt
-    # text_filters = []
-    # current_y = 20
-    # line_spacing = 10
-    
-    # # Timestamp line (own line at very top)
-    # if timestamp_text:
-    #     escaped_ts = _escape_drawtext(timestamp_text)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_ts}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += top_fontsize + line_spacing
-    
-    # # Setting text (up to two lines below timestamp)
-    # if top_text:
-    #     top_line1, top_line2 = _wrap_text_two_lines(top_text, 80)
-    #     escaped_top1 = _escape_drawtext(top_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_top1}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += top_fontsize + line_spacing
-    #     if top_line2:
-    #         escaped_top2 = _escape_drawtext(top_line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_top2}':x=20:y={current_y}:fontsize={top_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    #         current_y += top_fontsize + line_spacing
-    
-    # # Prompt text (up to two lines below setting)
-    # if bottom_text:
-    #     bottom_line1, bottom_line2 = _wrap_text_two_lines(bottom_text, 80)
-    #     escaped_bottom1 = _escape_drawtext(bottom_line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_bottom1}':x=20:y={current_y}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += bottom_fontsize + line_spacing
-    #     if bottom_line2:
-    #         escaped_bottom2 = _escape_drawtext(bottom_line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped_bottom2}':x=20:y={current_y}:fontsize={bottom_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
 
-    # # Add text overlays if provided
-    # text_filters = []
-    # current_y = 20
-    # line_spacing = 10
-    
-    # # Font sizes - timestamp larger, everything else same
-    # timestamp_fontsize = max(20, int(out_h * 0.05))
-    # body_fontsize = max(14, int(out_h * 0.03))
-    
-    # # Timestamp line (larger font)
-    # if timestamp_text:
-    #     escaped_ts = _escape_drawtext(timestamp_text)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped_ts}':x=20:y={current_y}:fontsize={timestamp_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += timestamp_fontsize + line_spacing
     # Add text overlays if provided
     text_filters = []
     current_y = 20
@@ -461,20 +317,7 @@ def generate_animatic_segment(
         )
         current_y += timestamp_fontsize + line_spacing
     
-    # Setting text (name + prompt, up to two lines)
-    # if setting_text:
-    #     line1, line2 = _wrap_text_two_lines(setting_text, 80)
-    #     escaped1 = _escape_drawtext(line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped1}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += body_fontsize + line_spacing
-    #     if line2:
-    #         escaped2 = _escape_drawtext(line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped2}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    #         current_y += body_fontsize + line_spacing
+
     # Setting text (name + prompt, up to two lines)
     if setting_text:
         line1, line2 = _wrap_text_two_lines(setting_text, 80)
@@ -490,50 +333,6 @@ def generate_animatic_segment(
             )
             current_y += body_fontsize + line_spacing
     
-    # # Style text (name + prompt, up to two lines)
-    # if style_text:
-    #     line1, line2 = _wrap_text_two_lines(style_text, 80)
-    #     escaped1 = _escape_drawtext(line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped1}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += body_fontsize + line_spacing
-    #     if line2:
-    #         escaped2 = _escape_drawtext(line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped2}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    #         current_y += body_fontsize + line_spacing
-    
-    # # Action text (up to two lines)
-    # if action_text:
-    #     line1, line2 = _wrap_text_two_lines(action_text, 80)
-    #     escaped1 = _escape_drawtext(line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped1}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += body_fontsize + line_spacing
-    #     if line2:
-    #         escaped2 = _escape_drawtext(line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped2}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    #         current_y += body_fontsize + line_spacing
-    
-    # # Inbetween prompt (up to two lines)
-    # if inbetween_text:
-    #     line1, line2 = _wrap_text_two_lines(inbetween_text, 80)
-    #     escaped1 = _escape_drawtext(line1)
-    #     text_filters.append(
-    #         f"drawtext=text='{escaped1}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #     )
-    #     current_y += body_fontsize + line_spacing
-    #     if line2:
-    #         escaped2 = _escape_drawtext(line2)
-    #         text_filters.append(
-    #             f"drawtext=text='{escaped2}':x=20:y={current_y}:fontsize={body_fontsize}:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10"
-    #         )
-    # Style text (name + prompt, up to two lines)
     if style_text:
         line1, line2 = _wrap_text_two_lines(style_text, 80)
         escaped1 = _escape_drawtext(line1)
@@ -656,24 +455,7 @@ def assemble_sequence_animatic(
     setting_prompt = seq_obj.get("setting_prompt", "")
     current_time = start_time_sec
 
-    # if setting_name and setting_prompt:
-    #     setting_text = f"{setting_name} {setting_prompt}"
-    # else:
-    #     setting_text = setting_name or setting_prompt
-    
-    # # Get style name and prompt
-    # style_id = seq_obj.get("style_id", "")
-    # style_name = _get_style_name(project_cfg, style_id)
-    # style_prompt = seq_obj.get("style_prompt", "")
-    
-    # # Combine style name and prompt
-    # if style_name and style_prompt:
-    #     style_text = f"{style_name} {style_prompt}"
-    # else:
-    #     style_text = style_name or style_prompt
-    
-    # # Get action prompt
-    # action_text = seq_obj.get("action_prompt", "")
+
     # Combine setting name and prompt
     if setting_name and setting_prompt:
         setting_text = f"{setting_name} {_strip_lora_tags(setting_prompt)}"
@@ -693,12 +475,6 @@ def assemble_sequence_animatic(
     
     # Get action prompt
     action_text = _strip_lora_tags(seq_obj.get("action_prompt", ""))
-
-    # # Combine name and prompt for top text
-    # if setting_name and setting_prompt:
-    #     top_text = f"{setting_name} - {setting_prompt}"
-    # else:
-    #     top_text = setting_name or setting_prompt
     
     for vid_id in ordered_vid_keys:
         vid = i2v.get(vid_id)
@@ -715,8 +491,6 @@ def assemble_sequence_animatic(
         start_img = _get_keyframe_image_path(seq_obj, start_kf_id)
         end_img = _get_keyframe_image_path(seq_obj, end_kf_id)
         
-        # Get inbetween prompt for lower third
-        # inbetween_prompt = vid.get("inbetween_prompt", "")
         # Get inbetween prompt for lower third
         inbetween_prompt = _strip_lora_tags(vid.get("inbetween_prompt", ""))
 
@@ -935,130 +709,6 @@ def _run_ffmpeg_stitch(
         print(f"Error: {e}")
         return None
 
-# def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, fps_mult: float, start_index: int = 0, layer_suffix: str = "") -> int:
-#     # V2 Access
-#     i2v = seq_obj.get("videos") or seq_obj.get("i2v_videos", {})
-#     if not i2v: return 0
-
-#     # V2 Ordering
-#     if "video_order" in seq_obj:
-#         ordered_vid_keys = seq_obj["video_order"]
-#     else:
-#         # Fallback to implicit order (V1) logic if needed, or sort
-#         ordered_vid_keys = sorted(i2v.keys(), key=lambda k: int(re.sub(r"\D", "", k) or 0))
-
-#     # Build ordered list of (vid_id, selected_path)
-#     # Filter for selected paths
-#     vids = []
-#     for k in ordered_vid_keys:
-#         if k in i2v and i2v[k].get("selected_video_path"):
-#             vids.append((k, i2v[k]["selected_video_path"]))
-
-#     if not vids: return 0
-
-#     vid_frame_dirs = []
-#     for k, sel in vids:
-#         d = frames_dir_from_selected_video_path(sel, layer_suffix)
-#         if not d or not d.exists():
-#             if layer_suffix:
-#                 print(f"Error: Layer '{layer_suffix}' not found for video {k}. Run Enhance batch first.")
-#                 return 0
-#             d = frames_dir_from_selected_video_path(sel, "") 
-#         vid_frame_dirs.append(d)
-    
-#     if not vid_frame_dirs or not vid_frame_dirs[0]: return 0
-
-#     seq_root = vid_frame_dirs[0].parents[1]
-#     bridges_root = seq_root / "bridges"
-    
-#     bridge_frame_dirs = []
-#     cut_instructions = [] 
-    
-#     # V2 Keyframes
-#     all_keyframes = seq_obj.get("keyframes") or seq_obj.get("i2v_base_images", {})
-
-#     for pair_idx in range(len(vids) - 1):
-#         a_key, _ = vids[pair_idx]
-#         b_key, _ = vids[pair_idx + 1]
-        
-#         # 1. Locate Bridge Frames
-#         latest_bridge_root = find_latest_bridge_dir(bridges_root, a_key, b_key)
-#         bridge_path = None
-#         if latest_bridge_root:
-#             layer_name = f"frames_{layer_suffix}" if layer_suffix else "frames"
-#             if (latest_bridge_root / layer_name).exists():
-#                 bridge_path = latest_bridge_root / layer_name
-#             elif (latest_bridge_root / "frames").exists():
-#                 bridge_path = latest_bridge_root / "frames"
-#         bridge_frame_dirs.append(bridge_path)
-
-#         # 2. Calculate Asymmetric Cuts
-#         lock_request = 1 
-#         offset_request = 0
-#         b_start_kf_id = i2v[b_key].get("start_keyframe_id") or i2v[b_key].get("start_id")
-        
-#         if b_start_kf_id and b_start_kf_id in all_keyframes:
-#             kf = all_keyframes[b_start_kf_id]
-#             try: 
-#                 lock_request = int(kf.get("join_smoothing_level", 1))
-#                 offset_request = int(kf.get("join_offset", 0))
-#             except: pass
-        
-#         if not bridge_path or lock_request <= 1:
-#             cut_instructions.append((0, 0))
-#         else:
-#             LOCK_N, BASE_WIN, BRIDGE_OUT = get_bridge_params(lock_request)
-#             safe_limit = max(0, BASE_WIN - LOCK_N)
-#             final_offset = max(-safe_limit, min(safe_limit, offset_request))
-            
-#             detected_mult = fps_mult
-#             if detected_mult == 1.0 and bridge_path and "_2xf" in str(bridge_path):
-#                 detected_mult = 2.0
-            
-#             input_tail_base = BASE_WIN - final_offset
-#             input_head_base = BASE_WIN + final_offset
-            
-#             cut_tail = int(input_tail_base * detected_mult)
-#             cut_head = int(input_head_base * detected_mult)
-#             cut_instructions.append((cut_tail, cut_head))
-
-#     if not dest_dir.exists(): dest_dir.mkdir(parents=True, exist_ok=True)
-
-#     frame_counter = start_index
-    
-#     # Process First Video (Head)
-#     first_frames = list_pngs(vid_frame_dirs[0])
-#     first_cut_tail = cut_instructions[0][0] if cut_instructions else 0
-    
-#     frames_to_copy = first_frames[:-first_cut_tail] if first_cut_tail > 0 else first_frames
-#     frame_counter = _copy_and_rename(frames_to_copy, dest_dir, frame_counter)
-
-#     # Process Interstices
-#     for i in range(len(bridge_frame_dirs)):
-#         bridge_dir = bridge_frame_dirs[i]
-#         vid_dir = vid_frame_dirs[i + 1]
-
-#         # Copy Bridge
-#         if bridge_dir:
-#             frame_counter = _copy_and_rename(list_pngs(bridge_dir), dest_dir, frame_counter)
-
-#         # Copy Next Video Body
-#         vid_frames = list_pngs(vid_dir)
-#         if not vid_frames: continue
-            
-#         cut_head_here = cut_instructions[i][1]
-        
-#         is_last = (i == len(bridge_frame_dirs) - 1)
-#         if is_last:
-#             frames_to_copy = vid_frames[cut_head_here:]
-#         else:
-#             cut_tail_next = cut_instructions[i+1][0]
-#             frames_to_copy = vid_frames[cut_head_here:-cut_tail_next] if cut_tail_next > 0 else vid_frames[cut_head_here:]
-        
-#         frame_counter = _copy_and_rename(frames_to_copy, dest_dir, frame_counter)
-
-#     return frame_counter - start_index
-
 def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, fps_mult: float, start_index: int = 0, layer_suffix: str = "") -> int:
     seq_id = seq_obj.get("id", "unknown")
     default_dur = float(project_cfg.get("inbetween_generation", {}).get("duration_default_sec", 3.0))
@@ -1135,7 +785,7 @@ def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, f
             kf = all_keyframes[b_start_kf_id]
             try: 
                 lock_request = int(kf.get("join_smoothing_level", 1))
-                offset_request = int(kf.get("join_offset", 0))
+                offset_request = int(kf.get("join_offset", 1))  ## default to 0 to leave in all frames, 1 clips out one
             except: pass
         
         if not bridge_path or lock_request <= 1:
@@ -1160,17 +810,6 @@ def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, f
 
     if not dest_dir.exists(): dest_dir.mkdir(parents=True, exist_ok=True)
 
-    # frame_counter = start_index
-    # frames_copied_debug = []
-    
-    # # Process First Video (Head)
-    # first_frames = list_pngs(vid_frame_dirs[0])
-    # first_cut_tail = cut_instructions[0][0] if cut_instructions else 0
-    
-    # frames_to_copy = first_frames[:-first_cut_tail] if first_cut_tail > 0 else first_frames
-    # before = frame_counter
-    # frame_counter = _copy_and_rename(frames_to_copy, dest_dir, frame_counter)
-    # frames_copied_debug.append((vids[0][0], frame_counter - before, first_cut_tail, 0))
     frame_counter = start_index
     frames_copied_debug = []
     
@@ -1218,12 +857,6 @@ def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, f
             
         cut_head_here = cut_instructions[i][1]
         
-        # is_last = (i == len(bridge_frame_dirs) - 1)
-        # if is_last:
-        #     frames_to_copy = vid_frames[cut_head_here:]
-        # else:
-        #     cut_tail_next = cut_instructions[i + 1][0]
-        #     frames_to_copy = vid_frames[cut_head_here:-cut_tail_next] if cut_tail_next > 0 else vid_frames[cut_head_here:]
         is_last = (i == len(bridge_frame_dirs) - 1)
         if is_last:
             # Trim last frame if open end
@@ -1333,21 +966,7 @@ def run_stitch(config_path: str, output_format: str, fps_mult: float = 1.0, resi
                     import traceback
                     traceback.print_exc()
                     raise
-            # for seq in sequences:
-            #     try:
-            #         frames_added = assemble_sequence_frames(
-            #             seq, 
-            #             project, 
-            #             temp_frames_path, 
-            #             fps_mult=fps_mult, 
-            #             start_index=total_frames, 
-            #             layer_suffix=layer_suffix
-            #         )
-            #         total_frames += frames_added
-            #     except TypeError as e:
-            #         import traceback
-            #         traceback.print_exc()
-            #         raise
+
             if DEBUG_FRAMES:
                 print(f"\n{'='*50}")
                 print(f"FINAL SUMMARY")
@@ -1358,7 +977,6 @@ def run_stitch(config_path: str, output_format: str, fps_mult: float = 1.0, resi
                 actual_secs = total_frames / final_fps
                 print(f"Actual duration: {actual_secs:.2f}s ({int(actual_secs // 60)}:{int(actual_secs % 60):02d})")
                 
-                # Calculate expected from config
                 # Calculate expected from config
                 expected_total = 0.0
                 for seq in sequences:
@@ -1419,5 +1037,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     config_abs = str(Path(args.config).resolve())
-    # run_stitch(config_abs, args.format, args.fps_mult, args.resize, args.layer, args.audio)
+
     run_stitch(config_abs, args.format, args.fps_mult, args.resize, args.layer, args.audio, args.animatic)

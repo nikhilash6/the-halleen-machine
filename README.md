@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.9 Candidate**  
+**Version 0.9.10 Candidate**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -40,15 +40,11 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure
-# Setup may recommend additional model dowloads and will give instructions
+# Configure and download needed models and custom nodes
 python setup.py
 
-# Refer to COMFYUI_INTEGRATION_GUIDE.md Phase 2 and 3 for dependencies
-echo "Don't forget to resolve dependencies found in COMFYUI_INTEGRATION_GUIDE.md"
-
 # Launch
-python app.py --listen 0.0.0.0 --port 7860
+python run.py --listen 0.0.0.0 --port 7860
 ```
 
 ---

@@ -1,10 +1,14 @@
 #!/bin/bash
 
 # ==============================================================================
-# 🛠️ THE HALLEEN MACHINE/COMFYUI RUNPOD INSTALLATION BIBLE (MARCH 2026)
+# 🛠️ THE HALLEEN MACHINE/COMFYUI RUNPOD INTEGRATION GUIDE (APRIL 2026)
 # ==============================================================================
-# This guide provides a clean, virtual-environment-based setup for RunPod 
+# This guide provides one possible setup for RunPod 
 # Future updates to ComfyUI may require further changes.
+# You are responsible for getting this running, and things change frequently so 
+# use your own guides if this one doesn't work perfectly.
+# Most popular LLMs are very good at getting you there.
+#
 # Start a pod with attached storage, assumed to be /workspace
 # Open ports 8188,7860
 # ==============================================================================
@@ -23,7 +27,7 @@ source venv/bin/activate
 
 # Upgrade pip and install the Core Engine (Torch + Base Requirements)
 pip install --upgrade pip
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu126
 pip install -r requirements.txt
 
 # Install high-level management and hardware monitoring tools
@@ -46,7 +50,7 @@ python3 main.py --listen 0.0.0.0 --port 8188
 
 
 # --- PHASE 1: INSTALL THE HALLEEN MACHINE  - Do not start if you do not have ComfyUI set up ---
-
+deactivate
 cd /workspace
 
 # Clone repository
@@ -69,7 +73,7 @@ python setup.py
 python download_models.py --all
 
 # optional: start the machine to see what works, most failures will be due to needed custom nodes that need to be installed next
-python app.py --listen 0.0.0.0 --port 7860
+python run.py --listen 0.0.0.0 --port 7860
 
 
 
@@ -98,7 +102,8 @@ git clone --recursive https://github.com/ltdrdata/ComfyUI-Impact-Pack
 git clone https://github.com/kijai/ComfyUI-KJNodes
 git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite
 git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation
-
+git clone https://github.com/sipherxyz/comfyui-art-venture
+git clone https://github.com/aria1th/ComfyUI-LogicUtils
 
 # 2CHAR specific -- optional if you don't want my 2CHAR workflow
 git clone https://github.com/chflame163/ComfyUI_LayerStyle
@@ -150,7 +155,7 @@ cd /workspace/the-halleen-machine
 source venv/bin/activate
 
 # start the app if needed
-python app.py --listen 0.0.0.0 --port 7860
+python run.py --listen 0.0.0.0 --port 7860
 
 # find the url in the RunPod panel running on port 7860
 

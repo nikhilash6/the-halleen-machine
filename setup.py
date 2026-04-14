@@ -984,6 +984,37 @@ def run_interactive():
             print("  python setup.py")
         print()
     
+    # =========================================================================
+    # Custom Nodes Installation
+    # =========================================================================
+    
+    print()
+    if prompt_yes_no("Install ComfyUI custom nodes?"):
+        print()
+        print("-" * 60)
+        print("Installing Custom Nodes")
+        print("-" * 60)
+        print()
+        
+        # Import and run install_nodes
+        try:
+            from install_nodes import run_install
+            installed, existing, failed = run_install(["core", "2char"])
+            
+            print()
+            if failed > 0:
+                print(f"⚠️  {failed} node(s) failed to install. See output above.")
+                print("   You can retry later with: python install_nodes.py --all")
+            elif installed > 0:
+                print(f"✓ Installed {installed} custom node(s).")
+                print("  Restart ComfyUI to load them.")
+        except Exception as e:
+            print(f"⚠️  Node installation error: {e}")
+            print("   You can install manually with: python install_nodes.py --all")
+    else:
+        print()
+        print("Skipped. Install later with: python install_nodes.py --all")
+    
     print()
     print("Setup complete! Run: python run.py")
     return 0

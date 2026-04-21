@@ -21,7 +21,48 @@ import shutil
 # --- Workflow/FPS Helpers ---
 DEBUG_FRAMES = True  # Set to False to disable debug output
 
+def lossless_from_selected_video(sel_path: str) -> Optional[Path]:
+    """Find matching lossless video for a compressed video path."""
+    if not sel_path:
+        return None
+    p = Path(sel_path)
+    # vid_00001_.mp4 → vid_00001__lossless.mkv
+    lossless = p.with_suffix("").with_name(p.stem + "_lossless.mkv")
+    if lossless.exists():
+        return lossless
+    # Also try without double underscore (varies by naming)
+    lossless_alt = Path(str(sel_path).replace(".mp4", "_lossless.mkv"))
+    if lossless_alt.exists():
+        return lossless_alt
+    return None
 
+
+def extract_frames_to_temp(lossless_path: Path, temp_dir: Path) -> Optional[Path]:
+    """Extract frames from lossless video to temp directory."""
+    import subprocess
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_pattern = temp_dir / "frame_%06d.png"
+    
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(lossless_path),
+        "-vsync", "0",
+        str(output_pattern)
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"[EXTRACT] Frames extracted to {temp_dir}")
+            return temp_dir
+        else:
+            print(f"[ERR] ffmpeg extract failed: {result.stderr}")
+            return None
+    except Exception as e:
+        print(f"[ERR] ffmpeg exception: {e}")
+        return None
+    
 def _strip_lora_tags(text: str) -> str:
     """Remove __lora:...:..__ tags from text."""
     if not text:
@@ -529,13 +570,45 @@ def assemble_sequence_animatic(
     return frame_counter - start_index, current_time
 
 
-def frames_dir_from_selected_video_path(sel_path: str, layer_suffix: str = "") -> Path:
+def frames_dir_from_selected_video_path(sel_path: str, layer_suffix: str = "", temp_base: Path = None) -> Path:
+    """
+    Get frames directory for a selected video.
+    Tries lossless video first (extracts to temp), falls back to frames folder.
+    """
+    vid_dir = Path(os.path.dirname(sel_path))
+    
+    # Extract index from video filename
+    fname = Path(sel_path).name
+    m = re.search(r'_(\d{5})_?\.mp4$', fname)
+    idx_str = m.group(1) if m else None
+    
+    # Try lossless video first (new format)
+    lossless = None
+    if layer_suffix and idx_str:
+        # Layer-specific lossless: frames_{layer}_{idx}_lossless.mkv
+        lossless_name = f"frames_{layer_suffix}_{idx_str}_lossless.mkv"
+        candidate = vid_dir / lossless_name
+        if candidate.exists():
+            lossless = candidate
+    elif not layer_suffix:
+        # Base lossless: matches the mp4 name
+        lossless = lossless_from_selected_video(sel_path)
+    
+    if lossless:
+        if temp_base is None:
+            temp_base = vid_dir / "_temp_extract"
+        suffix_tag = f"_{layer_suffix}" if layer_suffix else ""
+        temp_frames = temp_base / f"extract_{Path(sel_path).stem}{suffix_tag}"
+        extracted = extract_frames_to_temp(lossless, temp_frames)
+        if extracted:
+            return extracted
+    
+    # Fallback to legacy frames folder
     sp = sel_path.replace("/", "\\")
     m = re.search(r"^(.*)\\[^\\]+_(\d+)_\.mp4$", sp)
     if not m:
-        # Fallback logic...
         vid_dir = Path(os.path.dirname(sp))
-        search_pattern = f"frames_{layer_suffix}_*" if layer_suffix else "frames_*" # Modified search
+        search_pattern = f"frames_{layer_suffix}_*" if layer_suffix else "frames_*"
         candidates = sorted([p for p in vid_dir.glob(search_pattern) if p.is_dir()], reverse=True)
         if candidates: return candidates[0]
         if not layer_suffix: return vid_dir / "frames"
@@ -544,7 +617,6 @@ def frames_dir_from_selected_video_path(sel_path: str, layer_suffix: str = "") -
     base_dir = m.group(1)
     idx_str = m.group(2)
     
-    # Construct folder name based on layer
     folder_name = f"frames_{layer_suffix}_{idx_str}" if layer_suffix else f"frames_{idx_str}"
     return Path(base_dir) / folder_name
 
@@ -707,9 +779,9 @@ def _run_ffmpeg_stitch(
             return output_path.resolve()
     except Exception as e:
         print(f"Error: {e}")
-        return None
+        return None0
 
-def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, fps_mult: float, start_index: int = 0, layer_suffix: str = "") -> int:
+def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, fps_mult: float, start_index: int = 0, layer_suffix: str = "", temp_extract_base: Path = None) -> int:
     seq_id = seq_obj.get("id", "unknown")
     default_dur = float(project_cfg.get("inbetween_generation", {}).get("duration_default_sec", 3.0))
     base_fps = 16.0  # Could extract from workflow, but hardcode for debug
@@ -737,12 +809,12 @@ def assemble_sequence_frames(seq_obj: dict, project_cfg: dict, dest_dir: Path, f
 
     vid_frame_dirs = []
     for k, sel, vid_obj in vids:
-        d = frames_dir_from_selected_video_path(sel, layer_suffix)
+        d = frames_dir_from_selected_video_path(sel, layer_suffix, temp_base=temp_extract_base)
         if not d or not d.exists():
             if layer_suffix:
                 print(f"Error: Layer '{layer_suffix}' not found for video {k}. Run Enhance batch first.")
                 return 0
-            d = frames_dir_from_selected_video_path(sel, "") 
+            d = frames_dir_from_selected_video_path(sel, "", temp_base=temp_extract_base) 
         vid_frame_dirs.append(d)
         
         if DEBUG_FRAMES:
@@ -953,13 +1025,15 @@ def run_stitch(config_path: str, output_format: str, fps_mult: float = 1.0, resi
                             start_time_sec=cumulative_time
                         )
                     else:
+                        temp_extract = temp_frames_path / "_lossless_extract"
                         frames_added = assemble_sequence_frames(
                             seq, 
                             project, 
                             temp_frames_path, 
                             fps_mult=fps_mult, 
                             start_index=total_frames, 
-                            layer_suffix=layer_suffix
+                            layer_suffix=layer_suffix,
+                            temp_extract_base=temp_extract
                         )
                     total_frames += frames_added
                 except TypeError as e:

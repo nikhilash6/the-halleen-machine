@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.10 Candidate**  
+**Version 0.9.11 Candidate**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -14,14 +14,11 @@ Organize AI video projects into structured timelines. Create reusable asset libr
 
 - Python 3.11+ 
 - ComfyUI installed and running
-- Custom ComfyUI nodes installed, see COMFYUI_INTEGRATION_GUIDE.md
-
-## If you do not have ComfyUI running, refer instead to COMFYUI_INTEGRATION_GUIDE.md which covers installing both ComfyUI and The Halleen Machine
 
 
 ---
 
-## Basic Installation
+## Installation
 
 ```bash
 # Clone repository
@@ -56,14 +53,6 @@ python run.py --listen 0.0.0.0 --port 7860
 https://www.youtube.com/halleen
 
 ---
-
-## Known Bugs
-
-**Don't navigate too fast** 
-If you click too quickly between nodes you can get data corruption.  Long term fix is to migrate away from Gradio.
-
-**Don't generate while a batch is running** 
-If a batch is in progress, it's best to leave those items alone.  There are cases where the mp4 from one generation will be created as expected, but the individual frames are put in the folder of another generation.  It can be manually repaired but blocks upscale or export of that media.  Long term fix: revisions to the batch and queue system overall.
 
 
 ## Road Map

@@ -131,12 +131,19 @@ def _trigger_autosave(file_path, project_data, settings_str):
     """Helper to trigger the existing save logic with debouncing."""
     global _autosave_last_time
     
+    # Guard against incomplete inputs during initialization
+    if not file_path or not project_data:
+        print(f"[AUTOSAVE] Skipped - no file/data")
+        return
+    
     with _autosave_lock:
         now = time.time()
         if now - _autosave_last_time < _AUTOSAVE_DEBOUNCE_SEC:
-            return  # Skip, too soon since last save
+            print(f"[AUTOSAVE] Debounced")
+            return
         _autosave_last_time = now
     
+    print(f"[AUTOSAVE] Saving on tab switch: {file_path}")
     cb_save_project(file_path, project_data, settings_str)
 
 def _update_project_name_header(name: str):
@@ -527,7 +534,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
     with gr.Row(elem_id="header-row"):
         # Column 1: Title block
         with gr.Column(scale=1, min_width=300):
-            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.10</small>", elem_id="app-title")
+            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.11</small>", elem_id="app-title")
             project_name_header = gr.Markdown("", elem_id="project-path-display")
         
         # Column 2: Utility cluster
@@ -535,9 +542,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
             with gr.Row(elem_classes=["header-utility-row"]):
                 comfyui_status_md = gr.Markdown(elem_id="status_indicator")
                 refresh_all_btn = gr.Button("Refresh Data", variant="secondary", size="sm", elem_id="header-refresh-btn", visible=False)
-                # vid_express = form.add("project.inbetween_generation.express_video", 
-                #     gr.Checkbox(label="Rough Draft", info="Low fidelity but fast for initial validation"), 
-                #     default=False)
+
 
     # Shared state
     settings_json     = gr.State(value=settings_json_init)
@@ -878,7 +883,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
         outputs=[]
     ).then(
         fn=_eh_node_selected,
-        inputs=[preview_code, node_selector, node_selector], 
+        inputs=[preview_code, node_selector, gr.State(value=None)],  # cur_sel=None allows initial load
         outputs=node_selector_outputs,
         show_progress="hidden", queue=False
     )
@@ -1105,15 +1110,28 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
         show_progress="hidden"
     )
 
-    # PHASE 3: Direct atomic load - no buffers, no .then() chains
-    # IMPORTANT: Don't update file_picker (circular reference)
-    # DEBOUNCING: Automatically skips duplicate loads within 1 second
+    def _select_first_node_after_load(project_dict):
+        """After load, select the first sequence to populate the editor"""
+        data = project_dict if isinstance(project_dict, dict) else {}
+        seqs = data.get("sequences", {})
+        if seqs:
+            first_id = list(seqs.keys())[0]
+            # Call _eh_node_selected directly with first_id as raw_value
+            return _eh_node_selected(data, first_id, None)
+        # Return no-ops if no sequences
+        return tuple([gr.update()] * 67)
+
     file_picker.change(
         fn=load_and_update,
         inputs=[file_picker, settings_json],
         outputs=load_outputs_no_picker,
-        queue=True,  # Sequential processing to avoid state conflicts
+        queue=True,
         show_progress="minimal"
+    ).then(
+        fn=_select_first_node_after_load,
+        inputs=[preview_code],
+        outputs=node_selector_outputs,
+        show_progress="hidden", queue=False
     )
 
 
@@ -1312,25 +1330,29 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
             path = f"project.{key}" if not key.startswith("project.") else key
             _set_by_path(new_pj, path, val)
 
-        # Map flat metadata keys to UI return valuesT
+        # Map flat metadata keys to UI return values
+        # Use explicit None check to preserve falsey values like 0, False, ""
+        def _val_or_noop(val):
+            return gr.update() if val is None else val
+        
         return (
             new_pj,
-            data.get("width") or gr.update(), 
-            data.get("height") or gr.update(), 
-            data.get("style_prompt") or gr.update(),
-            data.get("model") or gr.update(), 
-            data.get("steps") or gr.update(), 
-            data.get("cfg") or gr.update(),
-            data.get("sampler") or gr.update(), 
-            data.get("scheduler") or gr.update(),
-            data.get("neg_global") or gr.update(), 
-            data.get("neg_kf") or gr.update(), 
-            data.get("neg_i2v") or gr.update(), 
-            data.get("neg_heal") or gr.update(),
-            data.get("lora_normalization.fg_enabled") or gr.update(), 
-            data.get("lora_normalization.fg_max") or gr.update(),
-            data.get("lora_normalization.bg_enabled") or gr.update(), 
-            data.get("lora_normalization.bg_max") or gr.update(),
+            _val_or_noop(data.get("width")), 
+            _val_or_noop(data.get("height")), 
+            _val_or_noop(data.get("style_prompt")),
+            _val_or_noop(data.get("model")), 
+            _val_or_noop(data.get("steps")), 
+            _val_or_noop(data.get("cfg")),
+            _val_or_noop(data.get("sampler")), 
+            _val_or_noop(data.get("scheduler")),
+            _val_or_noop(data.get("neg_global")), 
+            _val_or_noop(data.get("neg_kf")), 
+            _val_or_noop(data.get("neg_i2v")), 
+            _val_or_noop(data.get("neg_heal")),
+            _val_or_noop(data.get("lora_normalization.fg_enabled")), 
+            _val_or_noop(data.get("lora_normalization.fg_max")),
+            _val_or_noop(data.get("lora_normalization.bg_enabled")), 
+            _val_or_noop(data.get("lora_normalization.bg_max")),
             msg
         )
     test_style_btn.click(

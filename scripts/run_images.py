@@ -29,22 +29,14 @@ _LORA_RE = re.compile(r"__lora:([^:>]+):(.+?)__")
 _TEMPLATE_RE = re.compile(r'\[([a-zA-Z0-9_.]+)\]')
 _WC_RE = re.compile(r"\{([^{}]+)\}")
 
-# DEFAULT_IMAGE_TEMPLATE = """
-# [project.style_prompt]
-# [sequence.style_asset]
-# [sequence.style_prompt]
-# [sequence.setting_asset]
-# [sequence.setting_prompt]
-# [keyframe.layout]
-# [char.lora_keyword], [char.prompt]
-# """
+
 
 DEFAULT_IMAGE_TEMPLATE = """
-[project.style_prompt]
-[char.lora_keyword], [char.prompt]
 [keyframe.layout]
 [sequence.setting_asset]
 [sequence.setting_prompt]
+[project.style_prompt]
+[char.lora_keyword], [char.prompt]
 [sequence.style_asset]
 [sequence.style_prompt]
 """
@@ -53,24 +45,13 @@ DEFAULT_IMAGE_TEMPLATE_2CHAR = """
 LEFT: [char1.lora_keyword], [char1.prompt]
 RIGHT: [char2.lora_keyword], [char2.prompt]
 [keyframe.layout]
-[sequence.style_asset]
-[sequence.style_prompt]
 [sequence.setting_asset]
 [sequence.setting_prompt]
 [project.style_prompt]
+[sequence.style_asset]
+[sequence.style_prompt]
 """
 
-
-# DEFAULT_IMAGE_TEMPLATE_2CHAR = """
-# [project.style_prompt]
-# [sequence.style_asset]
-# [sequence.style_prompt]
-# [sequence.setting_asset]
-# [sequence.setting_prompt]
-# [keyframe.layout]
-# LEFT: [char1.lora_keyword], [char1.prompt]
-# RIGHT: [char2.lora_keyword], [char2.prompt]
-# """
 
 def is_flux2_workflow(wf_path):
     """Detect Flux2 workflow based on filename"""
@@ -199,13 +180,7 @@ def resolve_wildcards_in_dict(data):
         else:
             resolved[k] = v
     return resolved
-# def expand_inline_wildcards(text, iter_index=0):
-#     if not text: return ""
-#     def repl(m):
-#         opts = [p.strip() for p in m.group(1).split("|")]
-#         if not opts: return ""
-#         return random.choice(opts)
-#     return _WC_RE.sub(repl, text)
+
 
 def compose_image_prompt(template_str, project_data, sequence_data, keyframe_data, char_data=None, iter_index=0):
     if char_data is None: char_data = {}
@@ -310,11 +285,7 @@ def inject_pose_flips(workflow: dict, id_conf: dict):
     if not pose_node_id: return
 
     consumers = []
-    # for nid, node in workflow.items():
-    #     if "inputs" not in node: continue
-    #     for input_name, source in node["inputs"].items():
-    #         if isinstance(source, list) and len(source) == 2 and str(source[0]) == str(pose_node_id) and source[1] == 0:
-    #             consumers.append((nid, input_name))
+
     for nid, node in workflow.items():
         if not isinstance(node, dict): continue
         if "inputs" not in node: continue
@@ -417,11 +388,6 @@ def apply_power_lora(node, lora_name, strength):
     slot["lora"] = lora_name
     slot["strength"] = float(strength)
 
-# def update_checkpoints(workflow, model_name):
-#     if not model_name: return
-#     for title in ("LeftCheckpoint", "RightCheckpoint", "PoseCheckPoint"):
-#         for _, node in find_nodes_by_title(workflow, title):
-#             set_if_exists(node, "ckpt_name", model_name)
 
 def update_checkpoints(workflow, model_name):
     if not model_name: return
@@ -883,30 +849,12 @@ def run(config_path, status_file_override=None):
                     
                     if bg_mult < 1.0 or fg_mult < 1.0: print(f"[MIXER] {id_name}: BG x{bg_mult:.2f} | FG x{fg_mult:.2f}")
 
-                    # if num_chars >= 2:
-                    #     if left_char and right_char:
-                    #         for t, c in (("LeftLora", left_char), ("RightLora", right_char)):
-                    #             pass
-
-                    #         left_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, 0)
-                    #         right_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, 0)
-                    #         heal_p_raw = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, 0)
-
-
                     if num_chars >= 2:
                         if left_char and right_char:
                             for t, c in (("LeftLora", left_char), ("RightLora", right_char)):
                                 pass
 
-                            # # Pre-resolve wildcards: template once, each char slot once
-                            # resolved_template = expand_inline_wildcards(prompt_template_2char)
-                            # resolved_left = resolve_wildcards_in_dict(left_char)
-                            # resolved_right = resolve_wildcards_in_dict(right_char)
-                            
-                            # left_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_left)
-                            # right_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_right, resolved_right)
-                            # heal_p_raw = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_right)
-                            # Pre-resolve wildcards: template once, shared data once, each char slot once
+
                             resolved_template = expand_inline_wildcards(prompt_template_2char)
                             resolved_project = resolve_wildcards_in_dict(project)
                             resolved_seq = resolve_wildcards_in_dict(seq)
@@ -952,11 +900,7 @@ def run(config_path, status_file_override=None):
                         if isinstance(v, dict) and v.get("switch") == "On":
                             print(f"  - Unit {k}: Strength {v.get('strength')} | Range {v.get('start_percent')}-{v.get('end_percent')}")
 
-                    # --- DEBUG INSTRUMENTATION START ---
-                    # print(f"[DEBUG] Updating checkpoints and paths...")
-                    # update_checkpoints(graph, project.get("model"))
 
-                    # update_save_paths(graph, out_root, project_name, seq_id, id_name)
 
                     # --- DEBUG INSTRUMENTATION START ---
                     print(f"[DEBUG] Updating checkpoints and paths...")
@@ -991,24 +935,7 @@ def run(config_path, status_file_override=None):
                                         node["inputs"][cn_key] = target_cn
                                         print(f"[INJECT] {title} Slot {i} -> {target_cn}")
 
-                    # # Custom Injections based on Node Titles
-                    # for node_id, node in graph.items():
-                    #     title = node.get("_meta", {}).get("title", "")
 
-                    #     # Inject Inpainting Model into node titled "Inpaint Model"
-                    #     if title == "InpaintCheckpoint" and target_inpaint:
-                    #         if "inputs" in node and "ckpt_name" in node["inputs"]:
-                    #             node["inputs"]["ckpt_name"] = target_inpaint
-                    #             print(f"[INJECT] {title} -> {target_inpaint}")
-
-                    #     # Inject ControlNet Model into node titled "PoseControl"
-                    #     if title == "PoseControl" and target_cn:
-                    #         if "inputs" in node:
-                    #             for i in range(1, 4):
-                    #                 cn_key = f"controlnet_{i}"
-                    #                 if cn_key in node["inputs"]:
-                    #                     node["inputs"][cn_key] = target_cn
-                    #                     print(f"[INJECT] {title} Slot {i} -> {target_cn}")
 
                     update_save_paths(graph, out_root, project_name, seq_id, id_name)
 
@@ -1034,39 +961,11 @@ def run(config_path, status_file_override=None):
                         start = end
                         print(f"[SKIPPED] '{id_name}': Found {existing}/{n_images} images. (Increase iterations or set force=True to override)")
 
-                    for i in range(start, end):
-                        # Re-compose prompts for iter > 0 (wildcards)
-                        # if num_chars >= 2:
-                        #     if i > 0:
-                        #         lp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, i)
-                        #         rp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, i)
-                        #         hp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, i)
-                        #     else: lp, rp, hp = left_p_raw, right_p_raw, heal_p_raw
-                        #     set_text_on_titles(graph, "LeftPrompt", _LORA_RE.sub("", lp).strip())
-                        #     set_text_on_titles(graph, "RightPrompt", _LORA_RE.sub("", rp).strip())
-                        #     set_text_on_titles(graph, "HealPosPrompt", _LORA_RE.sub("", hp).strip())
-                        # else:
-                        #     sp = simple_p_raw if i == 0 else compose_image_prompt(prompt_template, project, seq, id_conf, character, i)
-                        #     set_text_on_titles(graph, "LeftPrompt", _LORA_RE.sub("", sp).strip())
+                    # for i in range(start, end):
+                    for iteration, i in enumerate(range(start, end)):
 
-                        # seed = base_seed + i * advance
-                        # update_seeds(graph, seed, sampler_cfg, sampler_name, sampler_scheduler, sampler_steps)
-                        # if num_chars >= 2:
-                        #     if i > 0:
-                        #         lp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, left_char, i)
-                        #         rp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, right_char, right_char, i)
-                        #         hp = compose_image_prompt_2char(prompt_template_2char, project, seq, id_conf, left_char, right_char, i)
-                        #     else: lp, rp, hp = left_p_raw, right_p_raw, heal_p_raw
                         if num_chars >= 2:
-                            # if i > 0:
-                            #     # Fresh wildcard resolution for new iteration
-                            #     resolved_template = expand_inline_wildcards(prompt_template_2char)
-                            #     resolved_left = resolve_wildcards_in_dict(left_char)
-                            #     resolved_right = resolve_wildcards_in_dict(right_char)
-                                
-                            #     lp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_left)
-                            #     rp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_right, resolved_right)
-                            #     hp = compose_image_prompt_2char_noresolve(resolved_template, project, seq, id_conf, resolved_left, resolved_right)
+
                             if i > 0:
                                 # Fresh wildcard resolution for new iteration
                                 resolved_template = expand_inline_wildcards(prompt_template_2char)
@@ -1095,11 +994,11 @@ def run(config_path, status_file_override=None):
                             sp = simple_p_raw if i == 0 else compose_image_prompt(prompt_template, project, seq, id_conf, character, i)
                             final_sp = _LORA_RE.sub("", sp).strip()
                             set_text_on_titles(graph, "LeftPrompt", final_sp)
-                            print(f"[PROMPT] Single: {final_sp}")
+                            print(f"[PROMPT] {final_sp}")
 
                         kf_seed_override = id_conf.get("sampler_seed_start")
                         effective_base_seed = int(kf_seed_override) if kf_seed_override is not None else base_seed
-                        seed = effective_base_seed + i * advance
+                        seed = effective_base_seed + ((i-1) * advance)
                         print(f"[GEN] Iteration {i+1} | Seed: {seed} | Base: {effective_base_seed} | Steps: {sampler_steps} | CFG: {sampler_cfg}")
                         update_seeds(graph, seed, sampler_cfg, sampler_name, sampler_scheduler, sampler_steps)
                                                 
@@ -1117,47 +1016,9 @@ def run(config_path, status_file_override=None):
                             pid = post_prompt(api_base, graph)
                             print("[PID]",pid)
                             ok = wait_history_done(api_base, pid, timeout_s=timeout_s)
-                            # if ok:
-                            #     snapshot = {
-                            #         "item_data": id_conf,
-                            #         "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
-                            #         "project_context": {"style_prompt": project.get("style_prompt"), "model": project.get("model"), "width": w, "height": h},
-                            #         "generation": {"seed": seed, "steps": sampler_steps, "cfg": sampler_cfg, "sampler": sampler_name, "scheduler": sampler_scheduler},
-                            #         "meta": {"timestamp": datetime.now().isoformat()}
-                            #     }
+
                             if ok:
-                                # snapshot = {
-                                    # "item_data": id_conf,
-                                    # "sequence_context": {"setting_prompt": seq.get("setting_prompt"), "style_prompt": seq.get("style_prompt")},
-                                # snapshot = {
-                                #     "item_data": id_conf,
-                                #     "sequence_context": {
-                                #         "setting_prompt": seq.get("setting_prompt"),
-                                #         "setting_asset": seq.get("setting_asset"),
-                                #         "style_prompt": seq.get("style_prompt"),
-                                #         "style_asset": seq.get("style_asset")
-                                #     },
-                                #     "project_context": {
-                                #         "style_prompt": project.get("style_prompt"),
-                                #         "model": project.get("model"),
-                                #         "width": w,
-                                #         "height": h,
-                                #         "negatives": {
-                                #             "global": project.get("negatives", {}).get("global"),
-                                #             "keyframes_all": project.get("negatives", {}).get("keyframes_all"),
-                                #             "inbetween_all": project.get("negatives", {}).get("inbetween_all"),
-                                #             "heal_all": project.get("negatives", {}).get("heal_all")
-                                #         },
-                                #         "lora_normalization": {
-                                #             "fg_enabled": project.get("lora_normalization", {}).get("fg_enabled"),
-                                #             "fg_max": project.get("lora_normalization", {}).get("fg_max"),
-                                #             "bg_enabled": project.get("lora_normalization", {}).get("bg_enabled"),
-                                #             "bg_max": project.get("lora_normalization", {}).get("bg_max")
-                                #         }
-                                #     },
-                                #     "generation": {"seed": seed, "steps": sampler_steps, "cfg": sampler_cfg, "sampler": sampler_name, "scheduler": sampler_scheduler},
-                                #     "meta": {"timestamp": datetime.now().isoformat()}
-                                # }
+
                                 executed_prompt = hp if num_chars >= 2 else sp
                                 snapshot = {
                                     "item_data": id_conf,
@@ -1203,11 +1064,7 @@ def run(config_path, status_file_override=None):
                                         final_path = cands[0] # [1] Capture path
                                         inject_metadata_png(final_path, snapshot)
                                         print(f"RESULT: {final_path}") # [2] EXPLICITLY PRINT FOR APP
-                                # if os.path.isdir(out_folder):
-                                #     cands = [os.path.join(out_folder, f) for f in os.listdir(out_folder) if f.startswith(base_filename) and f.lower().endswith(IMAGE_EXTS)]
-                                #     if cands:
-                                #         cands.sort(key=os.path.getmtime, reverse=True)
-                                #         inject_metadata_png(cands[0], snapshot)
+
                         except Exception as e: print(f"[ERR][a] {seq_id}/{id_name} i={i}: {e}")
 
                 except Exception as e:
@@ -1220,12 +1077,6 @@ def run(config_path, status_file_override=None):
         if status_path: _write_status(status_path, script_pid, "failed", error=str(e))
         sys.exit(1)
 
-# if __name__ == "__main__":
-#     ap = argparse.ArgumentParser()
-#     ap.add_argument("--config", required=True)
-#     ap.add_argument("--status-file", required=False)
-#     args = ap.parse_args()
-#     run(args.config, status_file_override=args.status_file)
 
 
 if __name__ == "__main__":

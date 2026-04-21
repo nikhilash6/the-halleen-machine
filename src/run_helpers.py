@@ -133,7 +133,7 @@ def cancel_upscale_batch(project_dict: dict, sequence_id=None):
 def build_enhance_manager():
     comps = {}
     with gr.Group():
-        gr.Markdown("### Enhance / Post-Process")
+        # gr.Markdown("### Enhance / Post-Process")
         with gr.Row():
             comps["chk_upscale"] = gr.Checkbox(label="Upscale (2x Res)", value=False)
             comps["chk_interp"] = gr.Checkbox(label="Interpolate (2x FPS)", value=False)
@@ -308,26 +308,16 @@ def _launch_detached_batch_script(command_parts: List[str], status_file_path: Pa
         except Exception as e: print(f"Warning: Could not clear status file: {e}")
 
     try:
-        # process = subprocess.Popen(
-        #     command_parts,
-        #     creationflags=subprocess.DETACHED_PROCESS,
-        #     close_fds=True,
-        #     env=env, cwd=cwd
-        # )
+
         process = ProcessManager.launch_detached(
             command_parts,
             cwd=str(cwd) if cwd else None,
             env=env
         )
         pid = process.pid
-        # log_msg = f"Batch process started with PID {pid}" # OLD
         log_msg = f"Batch process started with PID {pid}\nCLI: {' '.join(command_parts)}" # NEW
         if status_file_path:
             try:
-        # pid = process.pid
-        # log_msg = f"Batch process started with PID {pid}"
-        # if status_file_path:
-        #     try:
                 status_data = {"status": "starting", "pid": pid, "last_update": datetime.now().isoformat()}
                 with open(status_file_path, 'w', encoding='utf-8') as f: json.dump(status_data, f, indent=2)
             except Exception as e: log_msg += f"\nWarning: Could not write status file: {e}"
@@ -1232,21 +1222,7 @@ def handle_sequence_image_batch(pj, seq_id, iterations_override=None, cap=False,
         except (ValueError, TypeError):
             pass
     
-    # Apply cap/force logic
-    # if not cap:
-    #     seq_data = tmp.get("sequences", {}).get(seq_id, {})
-    #     for kf in seq_data.get("keyframes", {}).values():
-    #         kf["force_generate"] = True
-    
-    # # Apply seed sync/randomize logic
-    # if not sync:
-    #     import random
-    #     rand_seed = random.randint(0, 2**31 - 1)
-    #     if "project" not in tmp:
-    #         tmp["project"] = {}
-    #     if "keyframe_generation" not in tmp["project"]:
-    #         tmp["project"]["keyframe_generation"] = {}
-    #     tmp["project"]["keyframe_generation"]["sampler_seed_start"] = rand_seed
+
     # Apply cap/force logic and seed randomization
     import random
     seq_data = tmp.get("sequences", {}).get(seq_id, {})

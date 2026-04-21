@@ -16,7 +16,7 @@ import sys
 SCRIPT_DIRECTORY = str(Path(__file__).parent / "../scripts")
 TEMP_PROJECT_FILENAME = "__temp_project_video.json"
 
-def _create_temp_json_for_video_test(full_data: Dict, target_vid_id: str) -> Tuple[Dict | None, str | None, str | None]:
+def _create_temp_json_for_video_test(full_data: Dict, target_vid_id: str, seed_override: int = None) -> Tuple[Dict | None, str | None, str | None]:
     """
     Creates a minimal version of the project JSON for a single video clip test,
     targeting the real project output folder.
@@ -43,10 +43,17 @@ def _create_temp_json_for_video_test(full_data: Dict, target_vid_id: str) -> Tup
     # 2. Deep Copy Project
     temp_data = copy.deepcopy(full_data)
 
-    # Randomize seed for test run
+    # Randomize seed for test run (unless override provided)
     if "inbetween_generation" in temp_data["project"]:
         temp_data["project"]["inbetween_generation"]["video_iterations_default"] = 1
-        temp_data["project"]["inbetween_generation"]["seed_start"] = random.randint(0, 2**32 - 1)
+        if seed_override is not None:
+            temp_data["project"]["inbetween_generation"]["seed_start"] = seed_override
+            temp_data["project"]["inbetween_generation"]["advance_seed_by"] = 0  # No advancement for explicit seed
+            print(f"[DEBUG VID SEED] Using override: {seed_override}")
+        else:
+            rand_seed = random.randint(0, 2**32 - 1)
+            temp_data["project"]["inbetween_generation"]["seed_start"] = rand_seed
+            print(f"[DEBUG VID SEED] Using random: {rand_seed}")
 
     # 3. Isolate Sequence
     # In V2, sequences is a dict. We replace it with a dict containing ONLY our target.
@@ -96,7 +103,7 @@ def _create_temp_json_for_video_test(full_data: Dict, target_vid_id: str) -> Tup
     return temp_data, seq_id, target_vid_id
 
 
-def handle_test_video_generation(project_dict: dict, target_nid: str):
+def handle_test_video_generation(project_dict: dict, target_nid: str, seed_override: int = None):
     """The main generator function called to run the video script."""
     if not isinstance(project_dict, dict) or not target_nid:
         yield (None, "Error: No project data or target selected.", None)
@@ -105,7 +112,7 @@ def handle_test_video_generation(project_dict: dict, target_nid: str):
     full_data = project_dict
     
     # Create V2 Temp Data
-    temp_data, seq_id, vid_key = _create_temp_json_for_video_test(full_data, target_nid)
+    temp_data, seq_id, vid_key = _create_temp_json_for_video_test(full_data, target_nid, seed_override=seed_override)
     
     if not temp_data:
         yield (None, f"Error: Could not create test data for target '{target_nid}'.", None)

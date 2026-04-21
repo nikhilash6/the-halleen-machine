@@ -93,6 +93,12 @@ def recall_project_globals(file_path: str):
                 # Extract look fields from nested structure
                 pc = snapshot.get("project_context", {})
                 gen = snapshot.get("generation", {})
+
+                print(f"[RECALL DEBUG] snapshot keys: {list(snapshot.keys())}")
+                print(f"[RECALL DEBUG] project_context: {pc}")
+                print(f"[RECALL DEBUG] generation: {gen}")
+
+
                 negs = pc.get("negatives", {})
                 lora = pc.get("lora_normalization", {})
                 
@@ -101,10 +107,10 @@ def recall_project_globals(file_path: str):
                     "height": pc.get("height"),
                     "style_prompt": pc.get("style_prompt"),
                     "model": pc.get("model"),
-                    "steps": gen.get("steps"),
-                    "cfg": gen.get("cfg"),
-                    "sampler": gen.get("sampler"),
-                    "scheduler": gen.get("scheduler"),
+                    "steps": pc.get("steps"),
+                    "cfg": pc.get("cfg"),
+                    "sampler": pc.get("sampler"),
+                    "scheduler": pc.get("scheduler"),
                     "neg_global": negs.get("global"),
                     "neg_kf": negs.get("keyframes_all"),
                     "neg_i2v": negs.get("inbetween_all"),
@@ -797,7 +803,7 @@ def run_pose_preview_task(project_data: Dict, image_path: str, output_dir: str =
 
 
 
-def _create_temp_json_for_image_test(full_data: Dict, target_kf_id: str) -> Tuple[Dict | None, str | None, str | None]:
+def _create_temp_json_for_image_test(full_data: Dict, target_kf_id: str, seed_override: int = None) -> Tuple[Dict | None, str | None, str | None]:
     """
     Creates a minimal V2 project JSON for a single keyframe test.
     """
@@ -810,7 +816,13 @@ def _create_temp_json_for_image_test(full_data: Dict, target_kf_id: str) -> Tupl
 
     if "keyframe_generation" in temp_data["project"]:
         temp_data["project"]["keyframe_generation"]["image_iterations_default"] = 1
-        temp_data["project"]["keyframe_generation"]["sampler_seed_start"] = random.randint(0, 2**32 - 1)
+        if seed_override is not None:
+            temp_data["project"]["keyframe_generation"]["sampler_seed_start"] = seed_override
+            temp_data["project"]["keyframe_generation"]["advance_seed_by"] = 0  # No advancement for explicit seed
+            print(f"[DEBUG SEED] Using override: {seed_override}")
+        else:
+            temp_data["project"]["keyframe_generation"]["sampler_seed_start"] = random.randint(0, 2**32 - 1)
+            print(f"[DEBUG SEED] Using random: {temp_data['project']['keyframe_generation']['sampler_seed_start']}")
 
     # Isolate target sequence
     target_seq = temp_data["sequences"][seq_id]
@@ -821,6 +833,7 @@ def _create_temp_json_for_image_test(full_data: Dict, target_kf_id: str) -> Tupl
     # Set flags
     target_kf["image_iterations_override"] = 1
     target_kf["force_generate"] = True
+    # target_kf.pop("sampler_seed_start", None) 
     
     # Prune
     target_seq["keyframes"] = {target_kf_id: target_kf}
@@ -921,7 +934,7 @@ def save_style_to_project(temp_path: str, project_dict: dict):
     else:
         return msg  # Error message from save_to_project_folder
 
-def handle_test_generation(project_dict: dict, target_nid: str, path_at_start: str):
+def handle_test_generation(project_dict: dict, target_nid: str, path_at_start: str, seed_override: int = None):
     """
     The main function for the keyframe test generation button.
     Prepares data and calls the shared generation helper.
@@ -931,7 +944,7 @@ def handle_test_generation(project_dict: dict, target_nid: str, path_at_start: s
         return
 
     full_data = project_dict
-    temp_data, seq_id, kf_id = _create_temp_json_for_image_test(full_data, target_nid)
+    temp_data, seq_id, kf_id = _create_temp_json_for_image_test(full_data, target_nid, seed_override=seed_override)
 
     if not temp_data:
         yield (None, None, f"Error: Could not create test data for target '{target_nid}'.", None)

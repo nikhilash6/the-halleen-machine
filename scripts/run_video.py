@@ -238,6 +238,70 @@ def inject_frame_save_node(graph: dict, filename_prefix: str):
     except Exception as e: print(f"[WARN] Failed to inject frame save: {e}")
 
 
+def stitch_frames_to_lossless(frames_dir: str, output_path: str, fps: float = 16.0) -> bool:
+    """Stitch PNG frames to lossless FFV1 video."""
+    import subprocess
+    frames_dir = Path(frames_dir)
+    if not frames_dir.exists():
+        print(f"[WARN] Frames dir not found: {frames_dir}")
+        return False
+    
+    pngs = sorted(frames_dir.glob("*.png"))
+    if not pngs:
+        print(f"[WARN] No PNGs in {frames_dir}")
+        return False
+    
+    # Detect frame pattern - handle ComfyUI naming like frame_00001_.png
+    first = pngs[0].name
+    import re
+    # Try ComfyUI pattern first: prefix_00001_.png
+    m = re.match(r'^(.+_)(\d+)(_\.png)$', first)
+    if not m:
+        # Fallback: prefix00001.png (no trailing underscore)
+        m = re.match(r'^(.*)(\d+)(\.png)$', first)
+    if not m:
+        print(f"[WARN] Can't parse frame pattern from {first}")
+        return False
+    
+    prefix, num, suffix = m.groups()
+    num_digits = len(num)
+    pattern = f"{prefix}%0{num_digits}d{suffix}"
+    input_pattern = str(frames_dir / pattern)
+    
+    cmd = [
+        "ffmpeg", "-y",
+        "-framerate", str(fps),
+        "-i", input_pattern,
+        "-c:v", "ffv1",
+        "-level", "3",
+        "-pix_fmt", "yuv444p",
+        output_path
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"[LOSSLESS] Created {output_path}")
+            return True
+        else:
+            print(f"[ERR] ffmpeg failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"[ERR] ffmpeg exception: {e}")
+        return False
+
+
+def cleanup_temp_frames(frames_dir: str):
+    """Remove temp frames directory."""
+    import shutil
+    try:
+        if os.path.isdir(frames_dir):
+            shutil.rmtree(frames_dir)
+            print(f"[CLEANUP] Removed {frames_dir}")
+    except Exception as e:
+        print(f"[WARN] Failed to cleanup {frames_dir}: {e}")
+
+
 def jload(p):
     with open(p, "r", encoding="utf-8") as f: return json.load(f)
 
@@ -960,8 +1024,9 @@ def run(config_path, export_only=False, status_file_override=None):
                             print(f"[WARN] Missing keyframe image for {vid_id}. Skipping.")
                             continue
 
-                        # Frame path
-                        f_pre = os.path.join(vid_folder, f"frames_{it+1:05d}", f"{base_name}_{it+1:05d}")
+                        # Frame path - use temp folder, will rename after we know actual mp4 filename
+                        temp_frames_dir = os.path.join(vid_folder, "_temp_frames")
+                        f_pre = os.path.join(temp_frames_dir, "frame")
 
                         try: graph = jload(wf_path)
                         except Exception as e: print(f"[ERR] Workflow load failed: {e}"); break
@@ -1115,6 +1180,12 @@ def run(config_path, export_only=False, status_file_override=None):
                                     final_path = cands[0] 
                                     inject_metadata_mp4(cands[0], snap)
                                     print(f"RESULT: {final_path}")
+                                    
+                                    # Create lossless video from temp frames with matching name
+                                    if not is_ltx2 and os.path.isdir(temp_frames_dir):
+                                        lossless_path = final_path.replace(".mp4", "_lossless.mkv")
+                                        if stitch_frames_to_lossless(temp_frames_dir, lossless_path, fps=float(project_fps)):
+                                            cleanup_temp_frames(temp_frames_dir)
                                     
                                 if DROP_JOIN_FRAME and pos < len(iter_video_entries(seq)) - 1:
                                     # Logic to drop last frame if not last video

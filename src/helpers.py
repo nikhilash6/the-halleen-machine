@@ -111,7 +111,7 @@ DEFAULT_PROJECT = {
         "is_protected_from_empty_save": False,
         "style_prompt": "",
         "negatives": {
-            "global": "nsfw,nude",
+            "global": "(((nsfw))),(((nude)))",
             "keyframes_all": "",
             "inbetween_all": "",
             "heal_all": "",
@@ -122,7 +122,7 @@ DEFAULT_PROJECT = {
             "output_root": "D:/ComfyUI/output",
         },
         "keyframe_generation": {
-            "image_iterations_default": 3,
+            "image_iterations_default": 1,
             "sampler_seed_start": 0,
             "advance_seed_by": 1,
             "cfg": 4.0,
@@ -131,7 +131,7 @@ DEFAULT_PROJECT = {
         },
         "inbetween_generation": {
             "video_workflow_json": str(WORKFLOWS_DIR / "i2v_base.json"),
-            "video_iterations_default": 3,
+            "video_iterations_default": 1,
             "duration_default_sec": 2,
             "prompt_template": "",
             "seed_start": 0,
@@ -190,7 +190,7 @@ def load_config() -> dict:
                 "features": toml_data.get("features", DEFAULT_SETTINGS["features"]),
             }
             
-            print("✅ Loaded configuration from config.toml")
+            print("Loaded configuration from config.toml")
             
             # Validate critical paths and warn if empty
             if not config["models_root"]:
@@ -600,7 +600,7 @@ def _rows_with_times(data: Dict[str, Any]) -> List[Tuple[str, str]]:
             v_icon = "▶" if v_obj.get("selected_video_path") else "▷"
             
             # v_label = f"{v_icon} {v_time} {v_obj.get("vid")}"
-            v_label = f"{v_icon} {v_time} {v_obj.get('vid')}"
+            v_label = f"{v_icon} {v_time} {v_obj.get('id')}"
             if v_prompt:
                 v_label += f" | {v_prompt[:40]}"
             
@@ -1086,7 +1086,7 @@ def cb_save_project(current_file_path: str, current_project: dict, settings_json
 
         atomic_write(p, data)
  
-        print(f"✅ SAVE SUCCESS -> {p.name}")
+        print(f"SAVE -> {p.name}")
 
     except Exception as e: print(f"Error saving file: {e}")
 

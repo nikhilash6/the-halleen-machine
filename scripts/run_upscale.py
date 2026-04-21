@@ -12,6 +12,7 @@ import struct
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # --- CONFIGURATION ---
 # Verify this matches your actual ComfyUI input directory
@@ -24,6 +25,111 @@ DEFAULT_PROJECT_FPS = 16
 # Temp filename for the lossless stitch
 TEMP_VIDEO_NAME = "temp_stitch_lossless.mp4"
 
+
+def lossless_from_selected_video(sel_path: str) -> Optional[Path]:
+    """Find matching lossless video for a compressed video path."""
+    if not sel_path:
+        return None
+    p = Path(sel_path)
+    # Try both naming patterns
+    lossless = Path(str(sel_path).replace(".mp4", "_lossless.mkv"))
+    if lossless.exists():
+        return lossless
+    return None
+
+
+def copy_lossless_to_temp(lossless_path: Path, comfy_input_dir: Path, fps: float):
+    """Copy lossless video to ComfyUI input directory. Returns (path, w, h)."""
+    output_path = comfy_input_dir / TEMP_VIDEO_NAME
+    
+    # Get dimensions from lossless video
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=p=0",
+        str(lossless_path)
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        w, h = map(int, result.stdout.strip().split(","))
+    except Exception as e:
+        print(f"[WARN] Could not get dimensions from {lossless_path}: {e}")
+        return None, 0, 0
+    
+    # Transcode to H.264 lossless (ComfyUI VHS_LoadVideo may not support FFV1)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(lossless_path),
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-qp", "0",
+        "-pix_fmt", "yuv420p",
+        "-r", str(fps),
+        str(output_path)
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"[LOSSLESS] Transcoded {lossless_path.name} to temp")
+        return output_path, w, h
+    except Exception as e:
+        print(f"[ERR] Transcode failed: {e}")
+        return None, 0, 0
+
+
+def stitch_frames_to_lossless(frames_dir: Path, output_path: Path, fps: float = 16.0) -> bool:
+    """Stitch PNG frames to lossless FFV1 video."""
+    import re
+    if not frames_dir.exists():
+        print(f"[WARN] Frames dir not found: {frames_dir}")
+        return False
+    
+    pngs = sorted(frames_dir.glob("*.png"))
+    if not pngs:
+        print(f"[WARN] No PNGs in {frames_dir}")
+        return False
+    
+    # Detect frame pattern - handle ComfyUI naming like frame_00001_.png
+    first = pngs[0].name
+    m = re.match(r'^(.+_)(\d+)(_\.png)$', first)
+    if not m:
+        m = re.match(r'^(.*)(\d+)(\.png)$', first)
+    if not m:
+        print(f"[WARN] Can't parse frame pattern from {first}")
+        return False
+    
+    prefix, num, suffix = m.groups()
+    num_digits = len(num)
+    pattern = f"{prefix}%0{num_digits}d{suffix}"
+    input_pattern = str(frames_dir / pattern)
+    
+    cmd = [
+        "ffmpeg", "-y",
+        "-framerate", str(fps),
+        "-i", input_pattern,
+        "-c:v", "ffv1",
+        "-level", "3",
+        "-pix_fmt", "yuv444p",
+        str(output_path)
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"[LOSSLESS] Created {output_path}")
+            return True
+        else:
+            print(f"[ERR] ffmpeg failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"[ERR] ffmpeg exception: {e}")
+        return False
+
+    
 def _update_status(status_file, data):
     """Writes status to a JSON file safely."""
     if not status_file: return
@@ -317,17 +423,26 @@ def run(config_path, do_upscale, do_interp, status_file=None):
         if not selected_path: continue
         
         vid_folder = os.path.join(output_root, project_name, seq_id, vid_key)
-        frames_dir = find_frames_folder(vid_folder, selected_path)
         
-        if not frames_dir: continue
+        # Try lossless video first
+        lossless = lossless_from_selected_video(selected_path)
+        frames_dir = None if lossless else find_frames_folder(vid_folder, selected_path)
         
-        source_idx = frames_dir.name.split("_")[-1]
+        if not lossless and not frames_dir: 
+            continue
+        
+        # Extract index from video filename for output folder naming
+        import re
+        m = re.search(r'_(\d{5})_?\.mp4$', Path(selected_path).name)
+        source_idx = m.group(1) if m else "00001"
+        
         output_folder_name = f"frames_{folder_suffix_base}_{source_idx}"
         output_dir = Path(vid_folder) / output_folder_name
         
         tasks.append({
             "label": f"{seq_id}/{vid_key}",
             "frames_dir": frames_dir,
+            "lossless_path": lossless,
             "output_dir": output_dir,
             "output_folder_name": output_folder_name,
             "rel_prefix": f"{project_name}/{seq_id}/{vid_key}/{output_folder_name}/frame"
@@ -382,8 +497,13 @@ def run(config_path, do_upscale, do_interp, status_file=None):
             shutil.rmtree(task['output_dir'])
         os.makedirs(task['output_dir'], exist_ok=True)
         
-        # stitch_path, src_w, src_h = stitch_source_to_temp(task['frames_dir'], fps=DEFAULT_PROJECT_FPS)
-        stitch_path, src_w, src_h = stitch_source_to_temp(task['frames_dir'], fps=DEFAULT_PROJECT_FPS, comfy_input_dir=comfy_input_dir)
+        # Try lossless video first, fall back to frames folder
+        lossless = task.get('lossless_path')
+        if lossless:
+            stitch_path, src_w, src_h = copy_lossless_to_temp(lossless, comfy_input_dir, fps=DEFAULT_PROJECT_FPS)
+        else:
+            stitch_path, src_w, src_h = stitch_source_to_temp(task['frames_dir'], fps=DEFAULT_PROJECT_FPS, comfy_input_dir=comfy_input_dir)
+        
         if not stitch_path:
              print("[SKIP] Stitch failed.")
              continue
@@ -392,6 +512,21 @@ def run(config_path, do_upscale, do_interp, status_file=None):
             run_comfy_job(wf_path, task['rel_prefix'], api_base, 
                           do_upscale, do_interp, target_w, target_h, src_w, src_h,
                           upscale_model, interpolation_model)
+            
+            # Stitch output frames to lossless mkv
+            output_dir = task['output_dir']
+            # Compute FPS - base is 16, interpolation doubles it
+            out_fps = DEFAULT_PROJECT_FPS * (INTERPOLATION_MULTIPLIER if do_interp else 1)
+            lossless_name = f"{task['output_folder_name']}_lossless.mkv"
+            lossless_out = output_dir.parent / lossless_name
+            
+            if stitch_frames_to_lossless(output_dir, lossless_out, fps=out_fps):
+                # Remove frames folder after successful stitch
+                shutil.rmtree(output_dir)
+                print(f"[CLEANUP] Removed {output_dir}")
+            else:
+                print(f"[WARN] Keeping frames folder - lossless stitch failed")
+                
         except Exception as e:
             print(f"[ERR] Job failed: {e}")
         

@@ -2012,11 +2012,41 @@ def _eh_delete_video(project_dict: dict, loaded_nid: str, loaded_proj: str, path
     yield (data, gr.update(choices=choices, value=new_selection), gr.update(value=new_selection))
 
 
+def _eh_refresh_pose_previews(project_dict: dict, loaded_nid: str):
+    """Refresh pose preview and CN thumbnails after pose selection."""
+    data = project_dict if isinstance(project_dict, dict) else {}
+    kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
+    if kind != "kf" or not kf:
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+    
+    pose_path = kf.get("pose")
+    poses_dir = get_project_poses_dir(data)
+    
+    # Get CN thumbnails
+    pose_thumb = _resolve_aux_image(pose_path, "poses", data)
+    shape_thumb = _resolve_aux_image(pose_path, "shapes", data)
+    outline_thumb = _resolve_aux_image(pose_path, "outlines", data)
+    
+    # Refresh gallery with selection
+    gallery_items = get_pose_gallery_list(str(poses_dir)) if poses_dir else []
+    sel_idx = _resolve_gallery_index(pose_path, gallery_items)
+    
+    return (
+        gr.update(value=pose_path),                              # kf_pose_preview
+        gr.update(value=gallery_items, selected_index=sel_idx),  # kf_pose_gallery
+        gr.update(value=pose_thumb),                             # kf_cn_pose_thumb
+        gr.update(value=shape_thumb),                            # kf_cn_shape_thumb
+        gr.update(value=outline_thumb),                          # kf_cn_outline_thumb
+    )
+
+
 def _eh_pose_gallery_select(gallery_value, evt: gr.SelectData):
+    print(f"[POSE_SELECT] evt.index={evt.index}, gallery_value type={type(gallery_value)}, len={len(gallery_value) if gallery_value else 0}")
     if evt.index is None: return gr.update(value="")
     try:
         if isinstance(gallery_value, list) and 0 <= evt.index < len(gallery_value):
             item = gallery_value[evt.index]
+            print(f"[POSE_SELECT] item type={type(item)}, item={item}")
             if isinstance(item, (tuple, list)) and len(item) >= 1: return gr.update(value=str(item[0]) or "")
             if isinstance(item, dict) and "image" in item:
                 img = item.get("image")
@@ -3587,7 +3617,22 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             # Removed .then(_eh_kf_fields) - was causing save cascade during navigation
 
 
-            kf_pose_gallery.select(fn=_eh_pose_gallery_select, inputs=[kf_pose_gallery], outputs=[kf_pose], show_progress="hidden")
+            kf_pose_gallery.select(
+                fn=_eh_pose_gallery_select, 
+                inputs=[kf_pose_gallery], 
+                outputs=[kf_pose], 
+                show_progress="hidden"
+            ).then(
+                _eh_kf_fields,
+                inputs=kf_all_fields_inputs,
+                outputs=[preview],
+                show_progress="hidden"
+            ).then(
+                _eh_refresh_pose_previews,
+                inputs=[preview, loaded_node_id],
+                outputs=[kf_pose_preview, kf_pose_gallery, kf_cn_pose_thumb, kf_cn_shape_thumb, kf_cn_outline_thumb],
+                show_progress="hidden"
+            )
             # kf_clear_pose_btn.click(fn=_eh_clear_pose, inputs=[kf_pose_gallery], outputs=[kf_pose, kf_pose_gallery], show_progress="hidden", queue=False)
             kf_clear_pose_btn.click(
                 fn=_eh_clear_pose, 

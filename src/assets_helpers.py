@@ -1290,7 +1290,8 @@ def build_assets_tab(preview_code: gr.Code, settings_json: gr.State, current_fil
                         
                         char_lora_keyword = gr.Textbox(
                             label="LoRA Keywords",
-                            info="Trigger words for character LoRAs (e.g., 'john_character, wearing_suit')"
+                            info="Trigger words for character LoRAs (e.g., 'john_character, wearing_suit')",
+                            visible=False
                         )
                         
                         char_prompt_mod = gr.Textbox(
@@ -1434,7 +1435,8 @@ def build_assets_tab(preview_code: gr.Code, settings_json: gr.State, current_fil
                         
                         setting_lora_keyword = gr.Textbox(
                             label="LoRA Keywords",
-                            info="Trigger words for location/environment LoRAs"
+                            info="Trigger words for location/environment LoRAs",
+                            visible=False
                         )
                         
                         setting_prompt = gr.Textbox(
@@ -1563,7 +1565,8 @@ def build_assets_tab(preview_code: gr.Code, settings_json: gr.State, current_fil
                         
                         style_lora_keyword = gr.Textbox(
                             label="LoRA Keywords",
-                            info="Trigger words for style/aesthetic LoRAs"
+                            info="Trigger words for style/aesthetic LoRAs",
+                            visible=False
                         )
                         
                         style_prompt = gr.Textbox(

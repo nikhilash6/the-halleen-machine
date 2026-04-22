@@ -2040,18 +2040,21 @@ def _eh_refresh_pose_previews(project_dict: dict, loaded_nid: str):
     )
 
 
-def _eh_pose_gallery_select(gallery_value, evt: gr.SelectData):
-    print(f"[POSE_SELECT] evt.index={evt.index}, gallery_value type={type(gallery_value)}, len={len(gallery_value) if gallery_value else 0}")
-    if evt.index is None: return gr.update(value="")
+def _eh_pose_gallery_select(project_dict: dict, gallery_value, evt: gr.SelectData):
+    """Get original pose path using index lookup (avoids Gradio's filename sanitization)."""
+    if evt is None or evt.index is None: 
+        return gr.update(value="")
     try:
-        if isinstance(gallery_value, list) and 0 <= evt.index < len(gallery_value):
-            item = gallery_value[evt.index]
-            print(f"[POSE_SELECT] item type={type(item)}, item={item}")
-            if isinstance(item, (tuple, list)) and len(item) >= 1: return gr.update(value=str(item[0]) or "")
-            if isinstance(item, dict) and "image" in item:
-                img = item.get("image")
-                if isinstance(img, dict) and "path" in img: return gr.update(value=img["path"] or "")
-    except Exception: pass
+        poses_dir = get_project_poses_dir(project_dict)
+        if poses_dir:
+            # Fresh list from disk has real paths, same order as Gradio's cached gallery
+            original_list = get_pose_gallery_list(str(poses_dir))
+            if 0 <= evt.index < len(original_list):
+                path = str(original_list[evt.index][0])
+                print(f"[POSE_SELECT] idx={evt.index} -> {path}")
+                return gr.update(value=path)
+    except Exception as e:
+        print(f"[POSE_SELECT] Error: {e}")
     return gr.update(value="")
 
 # def _eh_clear_pose(gallery_items):
@@ -3346,7 +3349,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
 
                                             with gr.Row():
                                                 # kf_pose_gallery = gr.Gallery(label="Pose Library", height=200, columns=4, interactive=True, show_label=True, object_fit="contain", elem_id="kf_pose_gallery")
-                                                kf_pose_gallery = gr.Gallery(label="Pose Library", height=200, interactive=True, show_label=True, object_fit="contain", elem_id="kf_pose_gallery", allow_preview=False)
+                                                kf_pose_gallery = gr.Gallery(label="Pose Library", height=200, columns=4, interactive=True, show_label=True, object_fit="contain", elem_id="kf_pose_gallery", allow_preview=False)
                                                 
                                             with gr.Row():
                                                 # kf_flip_horiz = gr.Checkbox(label="Flip Horizontal", value=False)
@@ -3619,7 +3622,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
 
             kf_pose_gallery.select(
                 fn=_eh_pose_gallery_select, 
-                inputs=[kf_pose_gallery], 
+                inputs=[preview, kf_pose_gallery], 
                 outputs=[kf_pose], 
                 show_progress="hidden"
             ).then(

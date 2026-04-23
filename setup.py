@@ -1016,7 +1016,7 @@ def run_interactive():
         print("Skipped. Install later with: python install_nodes.py --all")
     
     print()
-    print("Setup complete! Run: python run.py")
+    print("Setup complete! Run: python run.py --listen 0.0.0.0 --port 7860")
     return 0
 
 

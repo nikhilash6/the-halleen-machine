@@ -1,6 +1,6 @@
 # The Halleen Machine
 
-**Version 0.9.13 Candidate**  
+**Version 0.9.14 Candidate**  
 Workflow management system for AI video generation using ComfyUI.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -30,7 +30,7 @@ python -m venv venv
 
 # Activate it
 # Windows:
-#venv\Scripts\activate
+venv\Scripts\activate
 # Linux/Mac:
 source venv/bin/activate
 

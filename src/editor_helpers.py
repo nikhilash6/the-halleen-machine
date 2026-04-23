@@ -2013,13 +2013,13 @@ def _eh_delete_video(project_dict: dict, loaded_nid: str, loaded_proj: str, path
 
 
 def _eh_refresh_pose_previews(project_dict: dict, loaded_nid: str):
-    """Refresh pose preview and CN thumbnails after pose selection."""
+    """Refresh pose preview, CN thumbnails, and workflow after pose selection."""
     data = project_dict if isinstance(project_dict, dict) else {}
     kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
     if kind != "kf" or not kf:
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
     
-    pose_path = kf.get("pose")
+    pose_path = kf.get("pose") or ""
     poses_dir = get_project_poses_dir(data)
     
     # Get CN thumbnails
@@ -2031,12 +2031,28 @@ def _eh_refresh_pose_previews(project_dict: dict, loaded_nid: str):
     gallery_items = get_pose_gallery_list(str(poses_dir)) if poses_dir else []
     sel_idx = _resolve_gallery_index(pose_path, gallery_items)
     
+    # Auto-select workflow based on pose filename (_1CHAR, _2CHAR)
+    new_workflow = "pose_1CHAR.json"  # default
+    if pose_path:
+        fname = os.path.basename(pose_path).upper()
+        if "_2CHAR" in fname:
+            new_workflow = "pose_2CHAR.json"
+        elif "_1CHAR" in fname:
+            new_workflow = "pose_1CHAR.json"
+    else:
+        new_workflow = "pose_OPEN.json"
+    
+    # Animal pose flag
+    animal_flag = "_ANIMAL" in pose_path.upper() if pose_path else False
+    
     return (
         gr.update(value=pose_path),                              # kf_pose_preview
         gr.update(value=gallery_items, selected_index=sel_idx),  # kf_pose_gallery
         gr.update(value=pose_thumb),                             # kf_cn_pose_thumb
         gr.update(value=shape_thumb),                            # kf_cn_shape_thumb
         gr.update(value=outline_thumb),                          # kf_cn_outline_thumb
+        gr.update(value=new_workflow),                           # kf_workflow_json
+        gr.update(value=animal_flag),                            # kf_cn_pose_animal
     )
 
 
@@ -2061,11 +2077,27 @@ def _eh_pose_gallery_select(project_dict: dict, gallery_value, evt: gr.SelectDat
 #     new_items = list(gallery_items) if gallery_items else []
 #     return gr.update(value=""), gr.update(value=new_items, selected_index=None)
 
-def _eh_clear_pose(gallery_items):
-    new_items = list(gallery_items) if gallery_items else []
+def _eh_clear_pose(project_dict: dict, loaded_nid: str, loaded_proj: str):
+    """Clear pose and reset CN settings, saving to project data."""
+    print(f"[CLEAR_POSE] Called with loaded_nid={loaded_nid}")
+    data = copy.deepcopy(project_dict) if isinstance(project_dict, dict) else {}
+    
+    # Save cleared values to project
+    if _check_ownership(data, loaded_nid, loaded_proj):
+        kf, kind, _, _ = _resolve_node_context(data, loaded_nid)
+        if kind == "kf" and kf is not None:
+            kf["pose"] = ""
+            kf["pose_flip_horizontal"] = False
+            kf["pose_flip_vertical"] = False
+            kf["controlnet_settings"] = copy.deepcopy(DEFAULT_KF_CN_SETTINGS)
+    
     return (
+        data,                                                                   # preview
         gr.update(value=""),                                                    # kf_pose
-        gr.update(value=new_items, selected_index=None),                        # kf_pose_gallery
+        gr.update(value=None),                                                  # kf_pose_preview
+        gr.update(value=None),                                                  # kf_cn_pose_thumb
+        gr.update(value=None),                                                  # kf_cn_shape_thumb
+        gr.update(value=None),                                                  # kf_cn_outline_thumb
         gr.update(value=False),                                                 # kf_flip_horiz
         gr.update(value=False),                                                 # kf_flip_vert
         gr.update(value=(DEFAULT_KF_CN_SETTINGS["1"]["switch"] == "On")),       # kf_cn_pose_enable
@@ -3610,6 +3642,27 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
                     comp.blur(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
                 # else:
                 #     comp.change(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
+            
+            # Character dropdowns need explicit .change() handlers (dropdowns don't have .blur())
+            # But must guard against firing during navigation when values are cleared
+            def _eh_char_change_guarded(project_dict, loaded_nid, loaded_proj, *fields):
+                data = project_dict if isinstance(project_dict, dict) else {}
+                _, kind, _, _ = _resolve_node_context(data, loaded_nid)
+                if kind != "kf":
+                    return data  # Not on a keyframe, skip
+                return _eh_kf_fields(project_dict, loaded_nid, loaded_proj, *fields)
+            
+            for comp in [kf_char_left, kf_char_right, kf_flip_horiz, kf_flip_vert]:
+                comp.change(_eh_char_change_guarded, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
+
+
+
+
+            # for comp in kf_all_fields_inputs[3:]: # Skip first 3
+            #     if isinstance(comp, gr.components.Textbox):
+            #         comp.blur(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
+                # else:
+                #     comp.change(_eh_kf_fields, kf_all_fields_inputs, [preview], show_progress="hidden", queue=True)
 
             # kf_pose.change(
             #     _eh_handle_pose_change,
@@ -3633,15 +3686,16 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             ).then(
                 _eh_refresh_pose_previews,
                 inputs=[preview, loaded_node_id],
-                outputs=[kf_pose_preview, kf_pose_gallery, kf_cn_pose_thumb, kf_cn_shape_thumb, kf_cn_outline_thumb],
+                outputs=[kf_pose_preview, kf_pose_gallery, kf_cn_pose_thumb, kf_cn_shape_thumb, kf_cn_outline_thumb, kf_workflow_json, kf_cn_pose_animal],
                 show_progress="hidden"
             )
             # kf_clear_pose_btn.click(fn=_eh_clear_pose, inputs=[kf_pose_gallery], outputs=[kf_pose, kf_pose_gallery], show_progress="hidden", queue=False)
             kf_clear_pose_btn.click(
                 fn=_eh_clear_pose, 
-                inputs=[kf_pose_gallery], 
+                inputs=[preview, loaded_node_id, loaded_project_name], 
                 outputs=[
-                    kf_pose, kf_pose_gallery,
+                    preview, kf_pose, kf_pose_preview,
+                    kf_cn_pose_thumb, kf_cn_shape_thumb, kf_cn_outline_thumb,
                     kf_flip_horiz, kf_flip_vert,
                     kf_cn_pose_enable, kf_cn_pose_strength, kf_cn_pose_start, kf_cn_pose_end,
                     kf_cn_shape_enable, kf_cn_shape_strength, kf_cn_shape_start, kf_cn_shape_end,

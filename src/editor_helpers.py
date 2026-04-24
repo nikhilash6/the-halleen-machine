@@ -3848,7 +3848,7 @@ def build_editor_tab(preview: gr.Code, settings_json: gr.State, current_file_pat
             # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
             # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image])
             # kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image, kf_exec_info], show_progress="hidden")
-            kf_gallery.select(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image, kf_exec_info], show_progress="hidden")
+            kf_gallery.change(_eh_set_selected_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery], outputs=[preview, kf_gallery_selection, main_preview_image, kf_exec_info], show_progress="hidden")
             kf_upload_btn.upload(_eh_upload_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_upload_btn], outputs=[preview, kf_gallery])
             # kf_delete_img_btn.click(_eh_delete_image, inputs=[preview, selected_node, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection, main_preview_image], show_progress="hidden")
             kf_delete_img_btn.click(_eh_delete_image, inputs=[preview, loaded_node_id, loaded_project_name, kf_gallery_selection], outputs=[preview, kf_gallery, kf_gallery_selection, main_preview_image], show_progress="hidden")

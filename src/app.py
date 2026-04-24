@@ -534,7 +534,7 @@ with gr.Blocks(title=APP_TITLE, theme=theme, css=custom_css) as demo:
     with gr.Row(elem_id="header-row"):
         # Column 1: Title block
         with gr.Column(scale=1, min_width=300):
-            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.15</small>", elem_id="app-title")
+            gr.Markdown(f"### {APP_TITLE} <small>v 0.9.16</small>", elem_id="app-title")
             project_name_header = gr.Markdown("", elem_id="project-path-display")
         
         # Column 2: Utility cluster

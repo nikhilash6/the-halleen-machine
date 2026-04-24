@@ -356,7 +356,7 @@ def post_prompt(api_base, graph):
     r.raise_for_status()
     return r.json().get("prompt_id")
 
-def wait_history_done(api_base, prompt_id, timeout_s=300, poll_s=1.0):
+def wait_history_done(api_base, prompt_id, timeout_s=3600, poll_s=1.0):
     url = api_base.rstrip("/") + f"/history/{prompt_id}"
     t0 = time.time()
     while True:
@@ -1146,7 +1146,10 @@ def run(config_path, export_only=False, status_file_override=None):
                             print(f"[DEBUG] Saved workflow to: {debug_path}")
                             
                             pid = post_prompt(api_base, graph)
-                            if wait_history_done(api_base, pid, timeout_s):
+                            print(f"[DEBUG] Posted prompt {pid}, waiting with timeout={timeout_s}s")
+                            wait_result = wait_history_done(api_base, pid, timeout_s)
+                            print(f"[DEBUG] wait_history_done returned: {wait_result}")
+                            if wait_result:
                                 completed_iters += 1
                                 snapshot_vid_data = dict(vid_conf)
                                 snapshot_vid_data["inbetween_prompt"] = pclean
@@ -1182,10 +1185,17 @@ def run(config_path, export_only=False, status_file_override=None):
                                     print(f"RESULT: {final_path}")
                                     
                                     # Create lossless video from temp frames with matching name
+                                    print(f"[LOSSLESS] is_ltx2={is_ltx2}, temp_frames_dir exists={os.path.isdir(temp_frames_dir)}, path={temp_frames_dir}")
                                     if not is_ltx2 and os.path.isdir(temp_frames_dir):
                                         lossless_path = final_path.replace(".mp4", "_lossless.mkv")
+                                        print(f"[LOSSLESS] Stitching to: {lossless_path}")
                                         if stitch_frames_to_lossless(temp_frames_dir, lossless_path, fps=float(project_fps)):
+                                            print(f"[LOSSLESS] Success, cleaning up")
                                             cleanup_temp_frames(temp_frames_dir)
+                                        else:
+                                            print(f"[LOSSLESS] Stitch failed!")
+                                    else:
+                                        print(f"[LOSSLESS] Skipped - is_ltx2={is_ltx2} or no temp_frames_dir")
                                     
                                 if DROP_JOIN_FRAME and pos < len(iter_video_entries(seq)) - 1:
                                     # Logic to drop last frame if not last video

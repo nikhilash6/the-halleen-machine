@@ -542,7 +542,7 @@ def run_preview_only(config_path: str, image_path: str, status_file_override: st
     
     project = config.get("project", {})
     api_base = project.get("comfy", {}).get("api_base", "http://127.0.0.1:8188")
-    timeout_s = float(project.get("comfy", {}).get("timeout_seconds", 300))
+    timeout_s = float(project.get("comfy", {}).get("timeout_seconds", 3600))
     out_root = project.get("comfy", {}).get("output_root", "")
     project_name = project.get("name", "__preview__")
     
@@ -701,7 +701,7 @@ def run(config_path, status_file_override=None):
     sequences = cfg["sequences"] # V2: Can be dict or list
 
     api_base = get(project, "comfy", "api_base")
-    timeout_s = float(get(project, "comfy", "timeout_seconds", default=300))
+    timeout_s = float(get(project, "comfy", "timeout_seconds", default=3600))
     out_root = get(project, "comfy", "output_root")
     project_name = project["name"]
     w, h = int(project["width"]), int(project["height"])

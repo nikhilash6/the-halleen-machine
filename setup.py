@@ -394,7 +394,7 @@ install_path = "{norm(paths['install_path'])}"
 api_base = "{api_base}"
 
 # Timeout for ComfyUI API calls in seconds
-timeout_seconds = 300
+timeout_seconds = 3600
 
 # Where ComfyUI saves generated images
 output_root = "{norm(paths['output_root'])}"

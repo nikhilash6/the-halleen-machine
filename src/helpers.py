@@ -74,7 +74,7 @@ STYLE_PRESETS = {
 DEFAULT_SETTINGS = {
     "comfy": {
         "api_base": "http://127.0.0.1:8188",
-        "timeout_seconds": 300,
+        "timeout_seconds": 3600,
         "output_root": ""  # Empty = must be configured in config.toml
     },
     "workspace_root": "./samples",
@@ -118,7 +118,7 @@ DEFAULT_PROJECT = {
         },
         "comfy": {
             "api_base": "",
-            "timeout_seconds": 300,
+            "timeout_seconds": 3600,
             "output_root": "D:/ComfyUI/output",
         },
         "keyframe_generation": {
@@ -379,7 +379,7 @@ def _ensure_project(data: Dict[str, Any]) -> Dict[str, Any]:
 
     comfy = proj.setdefault("comfy", {})
     comfy.setdefault("api_base", "")
-    comfy.setdefault("timeout_seconds", 300)
+    comfy.setdefault("timeout_seconds", 3600)
     comfy.setdefault("output_root", "D:/ComfyUI/output")
 
     ib = proj.setdefault("inbetween_generation", {})
@@ -879,7 +879,7 @@ def _ensure_nonempty_api_base(data: dict, settings_json: str) -> dict:
     
     pj = data["project"]
     pj["comfy"]["api_base"] = global_comfy.get("api_base", "http://127.0.0.1:8188")
-    pj["comfy"]["timeout_seconds"] = global_comfy.get("timeout_seconds", 300)
+    pj["comfy"]["timeout_seconds"] = global_comfy.get("timeout_seconds", 3600)
     pj["comfy"]["output_root"] = global_comfy.get("output_root", "D:/ComfyUI/output")
     return data
 
